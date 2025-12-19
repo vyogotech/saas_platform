@@ -1,0 +1,41 @@
+[
+ {
+  "doctype": "Plan",
+  "name": "Free Plan",
+  "plan_name": "Free Plan",
+  "plan_type": "Free",
+  "is_active": 1,
+  "price": 0,
+  "billing_cycle": "Monthly",
+  "max_users": 3,
+  "max_storage_gb": 5,
+  "features": "Basic features\n- 3 Users\n- 5GB Storage\n- Community Support",
+  "tenant_id": "SYSTEM"
+ },
+ {
+  "doctype": "Plan",
+  "name": "Business Basic",
+  "plan_name": "Business Basic",
+  "plan_type": "Business Basic",
+  "is_active": 1,
+  "price": 29.99,
+  "billing_cycle": "Monthly",
+  "max_users": 10,
+  "max_storage_gb": 50,
+  "features": "Professional features\n- 10 Users\n- 50GB Storage\n- Email Support\n- Advanced Reports",
+  "tenant_id": "SYSTEM"
+ },
+ {
+  "doctype": "Plan",
+  "name": "Business Pro",
+  "plan_name": "Business Pro",
+  "plan_type": "Business Pro",
+  "is_active": 1,
+  "price": 99.99,
+  "billing_cycle": "Monthly",
+  "max_users": -1,
+  "max_storage_gb": 500,
+  "features": "Enterprise features\n- Unlimited Users\n- 500GB Storage\n- Priority Support\n- Custom Integrations\n- API Access",
+  "tenant_id": "SYSTEM"
+ }
+]

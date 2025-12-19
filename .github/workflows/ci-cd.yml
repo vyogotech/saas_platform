@@ -1,0 +1,109 @@
+name: CI/CD Pipeline (Frappe v15)
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.10]
+        node-version: [18.x]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # 1. Frontend: تثبيت، فحص، وبناء جزئي
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node-version }}
+      - name: Install Frontend Dependencies
+        run: npm install
+      - name: Lint & Test Frontend
+        run: npm run lint && npm run test:frontend
+
+      # 2. Backend: إعداد بايثون، تثبيت تبعيات، فحص، واختبارات
+      - name: Use Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install Python Dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install frappe-bench
+      - name: Lint Backend
+        run: flake8 saas_platform
+      - name: Security Scan (Bandit & pip-audit)
+        run: |
+          pip install bandit pip-audit
+          bandit -r saas_platform -ll
+          pip-audit --fail-on high
+      - name: Run Backend Tests
+        run: pytest --maxfail=1 --disable-warnings -q
+
+  build-and-deploy:
+    needs: lint-and-test
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # 1. Frontend: إعادة بناء كاملة
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18.x
+      - run: npm install
+      - run: npm run build
+
+      # 2. Bench Init v15 & تثبيت التطبيق
+      - name: Setup Bench & Frappe v15
+        run: |
+          pip install frappe-bench
+          bench init frappe-bench --frappe-branch version-15 --skip-redis-config-generation
+          cd frappe-bench
+          bench get-app https://github.com/your-repo/saas_platform.git
+      - name: Create CI Site & Install App
+        run: |
+          cd frappe-bench
+          bench new-site ci-temp \
+            --no-mariadb-socket \
+            --admin-password admin \
+            --mariadb-root-password root \
+            --install-app erpnext@15 \
+            --install-app saas_platform
+
+      # 3. دمج أصول الواجهة الأمامية
+      - name: Copy Frontend Assets
+        run: |
+          cp -r frontend/public/dist/* frappe-bench/sites/ci-temp/public/dist/
+
+      # 4. Migrate & Build
+      - name: Migrate & Build
+        run: |
+          cd frappe-bench
+          bench --site ci-temp migrate
+          bench build
+
+      # 5. نشر على الإنتاج
+      - name: Deploy to Production
+        uses: appleboy/ssh-action@v0.1.5
+        with:
+          host: ${{ secrets.PROD_HOST }}
+          username: ${{ secrets.PROD_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          script: |
+            cd ~/frappe-bench
+            git pull origin main
+            npm install
+            npm run build
+            bench --site site-template.localhost migrate
+            bench build
+            sudo systemctl restart frappe-bench-gunicorn
+            sudo systemctl reload nginx

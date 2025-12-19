@@ -1,0 +1,14 @@
+name: multi-tenant-erpnext-dev
+services:
+  # All-in-one Frappe/ERPNext with built-in MariaDB, Redis, and site
+  dev-central-site:
+    image: docker.io/vyogo/erpnext:sne-version-15
+    ports:
+      - "8080:8000"
+    #command: sleep infinity
+    volumes:
+      - dev_site_data:/home/frappe/frappe-bench/sites
+      #mount the frappe saas platform app for central site
+      - ../saas_platform:/home/frappe/frappe-bench/apps/saas_platform:ro
+    networks:
+      - dev-frappe-network

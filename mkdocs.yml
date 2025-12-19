@@ -1,0 +1,30 @@
+site_name: SaaS Platform
+theme:
+  name: material
+  palette:
+    primary: deep-orange
+    accent: deep-orange
+  features:
+    - navigation.tabs
+    - content.code.copy
+    - search.highlight
+
+nav:
+  - Home: index.md
+  - Installation: installation.md
+  - Architecture: architecture.md
+  - Implementation: implementation.md
+  - Microservice Integration: integration.md
+
+markdown_extensions:
+  - admonition
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - tables
