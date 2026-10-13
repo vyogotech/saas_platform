@@ -5,3 +5,4 @@
 [post_model_sync]
 # Patches added in this section will be executed after doctypes are migrated
 saas_platform.patches.add_tenant_id_to_all_tables.execute
+saas_platform.patches.tag_platform_records

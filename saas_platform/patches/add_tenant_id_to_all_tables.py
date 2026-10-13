@@ -12,8 +12,8 @@ Usage:
 import frappe
 
 
-def execute():
-    """Main patch execution - called by bench migrate"""
+def execute(app=None):
+    """Main patch execution - called by bench migrate and after_app_install(app)"""
     print("\n" + "=" * 70)
     print("TENANT ID MIGRATION PATCH")
     print("=" * 70)
@@ -61,6 +61,9 @@ def execute():
             "Tenant ID migration completed with errors", "Tenant Migration")
 
     frappe.db.commit()
+    # SQL rewriter caches which tables carry tenant_id
+    from saas_platform.utils.sql_rewriter import clear_tenant_tables_cache
+    clear_tenant_tables_cache()
 
 
 def add_tenant_id_column(doctype_name):

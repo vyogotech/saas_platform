@@ -6,6 +6,9 @@ from frappe.model.document import Document
 import uuid
 from frappe.utils import nowdate, add_days
 
+from saas_platform.utils.roles import TENANT_ADMIN_PROFILE, sync_tenant_roles
+from saas_platform.utils.tenant import PLATFORM_TENANT, acting_tenant, bind_user_to_tenant_company
+
 
 class Tenant(Document):
     def get_default_currency(self):
@@ -51,23 +54,27 @@ class Tenant(Document):
         frappe.log(
             f"Tenant {self.tenant_name} created with tenant_id: {self.tenant_id}")
 
-        # 1. Create Customer (SYSTEM tenant_id - this is OUR customer for billing)
-        customer_name = self.create_customer()
+        # 1. Create Customer (PLATFORM tenant_id - this is OUR customer for billing)
+        with acting_tenant(PLATFORM_TENANT):
+            customer_name = self.create_customer()
 
-        # 2. Create default Company for the tenant (tenant's own company)
-        self.create_company()
+        # 2. Create default Company for the tenant (tenant's own company). Everything
+        #    created with it (chart of accounts, cost centers, warehouses) is tagged too.
+        with acting_tenant(self.tenant_id):
+            self.create_company()
 
         # 3. Create or update admin user for the tenant
         self.setup_admin_user()
 
-        # 4. Create Subscription with Free Plan (links Customer to Plan)
-        self.create_subscription(customer_name)
+        # 4. Create Subscription with Free Plan (links Customer to Plan); platform billing
+        with acting_tenant(PLATFORM_TENANT):
+            self.create_subscription(customer_name)
 
         # Save changes
         self.save()
 
     def create_customer(self):
-        """Create ERPNext Customer for billing (tenant_id = SYSTEM)"""
+        """Create ERPNext Customer for billing (tenant_id = PLATFORM via acting_tenant)"""
         try:
             customer_name = f"{self.tenant_name}"
 
@@ -87,10 +94,6 @@ class Tenant(Document):
                 "default_currency": self.get_default_currency(),
             })
             customer.insert(ignore_permissions=True)
-
-            # Set tenant_id = SYSTEM (this is OUR customer, not tenant's data)
-            frappe.db.set_value("Customer", customer.name,
-                                "tenant_id", "SYSTEM", update_modified=False)
             frappe.db.commit()
 
             frappe.log(
@@ -148,6 +151,8 @@ class Tenant(Document):
                     f"Updated existing user {self.admin_email} with tenant_id: {self.tenant_id}")
             else:
                 # Create new user
+                if not frappe.db.exists("Role Profile", TENANT_ADMIN_PROFILE):
+                    sync_tenant_roles()
                 user = frappe.get_doc({
                     "doctype": "User",
                     "email": self.admin_email,
@@ -155,13 +160,8 @@ class Tenant(Document):
                     "enabled": 1,
                     "user_type": "System User",
                     "send_welcome_email": 0,  # Don't send email during creation
-                    "roles": [
-                        {"role": "System Manager"},
-                        {"role": "Accounts Manager"},
-                        {"role": "Sales Manager"},
-                        {"role": "Purchase Manager"},
-                        {"role": "Stock Manager"},
-                    ]
+                    # System-Manager-like role set without site-wide powers (utils/roles.py)
+                    "role_profiles": [{"role_profile": TENANT_ADMIN_PROFILE}],
                 })
                 user.insert(ignore_permissions=True)
 
@@ -173,28 +173,14 @@ class Tenant(Document):
                 frappe.log(
                     f"Created admin user: {self.admin_email} for tenant: {self.tenant_id}")
 
-            # Bind tenant's Company to admin user via User Permission
-            company_name = getattr(self, "company", None) or frappe.db.get_value("Company", {"tenant_id": self.tenant_id}, "name") or self.tenant_name
-            if frappe.db.exists("Company", company_name) and not frappe.db.exists("User Permission", {
-                "user": self.admin_email,
-                "allow": "Company",
-                "for_value": company_name
-            }):
-                user_perm = frappe.get_doc({
-                    "doctype": "User Permission",
-                    "user": self.admin_email,
-                    "allow": "Company",
-                    "for_value": company_name,
-                    "is_default": 1
-                })
-                user_perm.insert(ignore_permissions=True)
-                frappe.db.commit()
-                frappe.log(f"Created Company User Permission for {self.admin_email}: {company_name}")
-
         except Exception as e:
             frappe.log_error(
                 f"Failed to setup admin user for tenant {self.tenant_id}: {str(e)}")
-            # Don't throw - user can be set up later
+            # A tenant without a bound admin is half-provisioned; fail the insert
+            raise
+
+        # Outside the try: an admin without the Company binding is an isolation gap, so fail loudly
+        bind_user_to_tenant_company(self.admin_email, self.tenant_id)
 
     def create_subscription(self, customer_name):
         """Create Subscription linking Customer to Free Plan"""
@@ -221,10 +207,6 @@ class Tenant(Document):
                 }]
             })
             subscription.insert(ignore_permissions=True)
-
-            # Set tenant_id = SYSTEM (this is OUR subscription record)
-            frappe.db.set_value("Subscription", subscription.name,
-                                "tenant_id", "SYSTEM", update_modified=False)
             frappe.db.commit()
 
             self.subscription = subscription.name

@@ -86,20 +86,21 @@ def has_permission(doc, ptype, user):
     if user == "Administrator":
         return True
 
-    # Check if document has tenant_id field
-    if not hasattr(doc, 'tenant_id'):
-        return True  # No tenant_id field, allow access
-
-    # SYSTEM data is accessible to all
-    if doc.tenant_id == "SYSTEM":
+    # Unsaved docs and doctypes without the raw tenant_id column, or shared (SYSTEM) data
+    # (SYSTEM users, e.g. Administrator, are platform accounts, not shared data)
+    doc_tenant = getattr(doc, "tenant_id", None)
+    if not doc_tenant or (doc_tenant == "SYSTEM" and doc.doctype != "User"):
         return True
 
-    # Get user's tenant_id
     try:
-        user_tenant_id = frappe.db.get_value("User", user, "tenant_id")
+        if user == frappe.session.user:
+            from saas_platform.utils.tenant import get_tenant_id
+            user_tenant_id = get_tenant_id()
+        else:
+            user_tenant_id = frappe.db.get_value("User", user, "tenant_id")
 
-        # User must belong to same tenant
-        return doc.tenant_id == user_tenant_id
+        # Platform staff see every tenant; everyone else only their own
+        return user_tenant_id == "SYSTEM" or doc_tenant == user_tenant_id
 
     except Exception as e:
         frappe.log_error(f"Error in has_permission: {str(e)}")

@@ -1,8 +1,14 @@
 """Tenant management utilities"""
 import frappe
 from frappe import _
+import contextlib
 import random
 import string
+
+# Records the platform keeps about tenants (level-1 billing: our Customer, Subscription and
+# invoices per tenant, the platform Company). Never visible to tenants: the tenant scope is
+# "own tenant_id OR 'SYSTEM'", and SYSTEM stays for reference data shared by everyone.
+PLATFORM_TENANT = "PLATFORM"
 
 
 def on_session_creation(login_manager):
@@ -14,7 +20,8 @@ def on_session_creation(login_manager):
 
     # Administrator always gets SYSTEM tenant_id
     if user == "Administrator":
-        frappe.session['tenant_id'] = "SYSTEM"
+        frappe.session.data["tenant_id"] = "SYSTEM"
+        _persist_session()
         frappe.log(f"Session created for Administrator with tenant_id=SYSTEM")
         return
 
@@ -24,7 +31,9 @@ def on_session_creation(login_manager):
         tenant_id = getattr(user_doc, 'tenant_id', None)
 
         if tenant_id:
-            frappe.session['tenant_id'] = tenant_id
+            # session.data is what Frappe persists; top-level session keys are lost on the next request
+            frappe.session.data["tenant_id"] = tenant_id
+            _persist_session()
             frappe.log(
                 f"Session created for {user} with tenant_id={tenant_id}")
         else:
@@ -33,17 +42,24 @@ def on_session_creation(login_manager):
         frappe.log_error(f"Failed to get tenant_id for user {user}: {str(e)}")
 
 
+def _persist_session():
+    # The session row and cache are written before on_session_creation runs; save again
+    # so later requests read tenant_id from the session instead of re-querying User.
+    if session_obj := getattr(frappe.local, "session_obj", None):
+        session_obj.update(force=True)
+
+
 def set_tenant_id(doc, method=None):
     """Automatically set tenant_id when documents are created"""
-    # Skip if user is Administrator (bypass tenant isolation)
-    if frappe.session.user == "Administrator":
-        return
+    # During tenant provisioning (run as Administrator), tag everything created
+    # for the tenant: Company, chart of accounts, cost centers, warehouses, ...
+    acting_tenant = getattr(frappe.local, "saas_acting_tenant", None)
 
     # Skip system doctypes that shouldn't have tenant isolation
     system_doctypes = [
         'Usera', 'Role', 'DocType', 'DocField', 'DocPerm', 'Module Def',
         'Domain', 'Domain Settings', 'Tenant', 'Plan', 'aSubscription Plan',
-        'Subscription', 'Subscription Plan Detail', 'aCustomer',
+        'aCustomer',
         'Workspace', 'Workflow', 'Print Format', 'Email Template',
         'System Settings', 'Website Settings', 'Portal Settings',
         'Error Log', 'Activity Log', 'Version', 'Communication',
@@ -57,21 +73,66 @@ def set_tenant_id(doc, method=None):
     if getattr(doc, 'tenant_id', None):
         return
 
-    # Get current user's tenant_id from context or user
-    tenant_id = frappe.session.get('tenant_id')
-    print("Tenant ID in session:", tenant_id)
-    if not tenant_id:
-        # Try to get tenant_id from the User's default tenant
-        try:
-            user = frappe.get_doc("User", frappe.session.user)
-            if hasattr(user, 'tenant_id') and user.tenant_id:
-                tenant_id = user.tenant_id
-        except:
-            pass
+    if frappe.session.user == "Administrator":
+        # Administrator / scheduler (e.g. Subscription invoices): inherit the Company's tenant,
+        # so platform billing stays PLATFORM and a tenant's own scheduled docs stay theirs
+        tenant_id = acting_tenant or _company_tenant(doc)
+    else:
+        tenant_id = acting_tenant or get_tenant_id()
 
     # Set tenant_id if found
     if tenant_id:
         doc.tenant_id = tenant_id
+
+
+def _company_tenant(doc):
+    company = doc.get("company")
+    tenant_id = frappe.get_cached_value("Company", company, "tenant_id") if company else None
+    return tenant_id if tenant_id and tenant_id != "SYSTEM" else None
+
+
+def get_platform_company():
+    """The Company the platform bills tenants from (site config override, else global default)."""
+    return frappe.conf.get("saas_platform_company") or frappe.defaults.get_global_default("company")
+
+
+def persist_tenant_id(doc, method=None):
+    """
+    Write doc.tenant_id to the row and its child rows.
+
+    tenant_id is a raw ALTER TABLE column, not a DocField, so Frappe's ORM never
+    includes it in INSERT/UPDATE. Without this every row keeps DEFAULT 'SYSTEM'.
+    Runs on after_insert / on_update / on_update_after_submit so child rows added
+    in later saves are tagged too.
+    """
+    tenant_id = doc.get("tenant_id")
+    if not tenant_id or tenant_id == "SYSTEM" or doc.meta.istable:
+        return
+
+    from saas_platform.utils.sql_rewriter import get_tenant_tables
+
+    tables = get_tenant_tables()
+    if f"tab{doc.doctype}" in tables:
+        frappe.db.set_value(doc.doctype, doc.name, "tenant_id", tenant_id, update_modified=False)
+
+    for df in doc.meta.get_table_fields():
+        if f"tab{df.options}" in tables:
+            frappe.db.set_value(
+                df.options,
+                {"parent": doc.name, "parenttype": doc.doctype, "parentfield": df.fieldname},
+                "tenant_id", tenant_id, update_modified=False,
+            )
+
+
+@contextlib.contextmanager
+def acting_tenant(tenant_id):
+    """Tag documents created inside this block with tenant_id (tenant provisioning)."""
+    previous = getattr(frappe.local, "saas_acting_tenant", None)
+    frappe.local.saas_acting_tenant = tenant_id
+    try:
+        yield
+    finally:
+        frappe.local.saas_acting_tenant = previous
 
 
 def generate_tenant_id():
@@ -86,17 +147,80 @@ def generate_tenant_id():
             return tenant_id
 
 
+@contextlib.contextmanager
+def internal_query():
+    """Run platform lookups without tenant SQL rewriting (prevents recursion)."""
+    depth = getattr(frappe.local, "saas_internal_depth", 0)
+    frappe.local.saas_internal_depth = depth + 1
+    try:
+        yield
+    finally:
+        frappe.local.saas_internal_depth = depth
+
+
+def in_internal_query():
+    return getattr(frappe.local, "saas_internal_depth", 0) > 0
+
+
 def get_tenant_id():
-    """Get the current user's tenant_id"""
-    tenant_id = frappe.session.get('tenant_id')
+    """
+    Get the current user's tenant_id.
 
-    if not tenant_id:
-        user = frappe.get_doc("User", frappe.session.user)
-        if hasattr(user, 'tenant_id') and user.tenant_id:
-            tenant_id = user.tenant_id
-            frappe.session['tenant_id'] = tenant_id
+    on_session_creation is the only writer of session.data["tenant_id"]. Requests
+    without it (background jobs, where frappe.set_user creates an empty session, or
+    sessions created before that hook was deployed) fall back to the User record;
+    the result is memoised on frappe.local, keyed by user, never written to the session.
+    """
+    session = frappe.session
+    user = session.user if session else None
+    if not user or user == "Guest":
+        return None
 
+    data = session.get("data") or {}
+    tenant_id = data.get("tenant_id")
+    if tenant_id:
+        return tenant_id
+
+    cached = getattr(frappe.local, "saas_tenant_ctx", None)
+    if cached and cached[0] == user:
+        return cached[1]
+
+    with internal_query():
+        tenant_id = frappe.db.get_value("User", user, "tenant_id") or None
+    frappe.local.saas_tenant_ctx = (user, tenant_id)
     return tenant_id
+
+
+def get_tenant_company(tenant_id):
+    """Company provisioned for tenant_id. Looked up only by tenant_id, never by name."""
+    if not tenant_id or tenant_id == "SYSTEM":
+        return None
+    with internal_query():
+        return frappe.db.get_value("Company", {"tenant_id": tenant_id}, "name", order_by="creation asc")
+
+
+def bind_user_to_tenant_company(user, tenant_id):
+    """Restrict user to their tenant's Company via User Permission (enforced on report filters)."""
+    company = get_tenant_company(tenant_id)
+    if not company:
+        frappe.throw(_("No Company found for tenant {0}").format(tenant_id))
+
+    if not frappe.db.exists("User Permission", {"user": user, "allow": "Company", "for_value": company}):
+        frappe.get_doc({
+            "doctype": "User Permission",
+            "user": user,
+            "allow": "Company",
+            "for_value": company,
+            "is_default": 1,
+        }).insert(ignore_permissions=True)
+    return company
+
+
+def on_user_insert(doc, method=None):
+    """Users created inside a tenant inherit tenant_id via set_tenant_id; bind their Company."""
+    tenant_id = doc.get("tenant_id")
+    if tenant_id and tenant_id != "SYSTEM":
+        bind_user_to_tenant_company(doc.name, tenant_id)
 
 
 def apply_tenant_filter(doc, method=None):
@@ -120,11 +244,17 @@ def get_permission_query_conditions(user, doctype):
     if user == "Administrator":
         return None
 
+    # Users: tenant user managers only see their own tenant's users
+    if doctype == "User":
+        tenant_id = get_tenant_id()
+        if tenant_id in (None, "SYSTEM"):
+            return None
+        return f"`tabUser`.`tenant_id` = {frappe.db.escape(tenant_id)}"
+
     # System doctypes don't get filtered
     system_doctypes = [
-        'User', 'Role', 'DocType', 'DocField', 'DocPerm', 'Module Def',
-        'Domain', 'Domain Settings', 'Tenant', 'Plan', 'Subscription Plan',
-        'Subscription', 'Subscription Plan Detail', 'Customer',
+        'Role', 'DocType', 'DocField', 'DocPerm', 'Module Def',
+        'Domain', 'Domain Settings', 'Plan',
         'Workspace', 'Workflow', 'Print Format', 'Email Template',
         'System Settings', 'Website Settings', 'Portal Settings',
         'Error Log', 'Activity Log', 'Version', 'Communication',
@@ -142,10 +272,10 @@ def get_permission_query_conditions(user, doctype):
         return f"(`tab{doctype}`.`tenant_id` = 'SYSTEM' OR `tab{doctype}`.`tenant_id` IS NULL)"
 
     # User can see their own tenant's data + SYSTEM data
-    return f"(`tab{doctype}`.`tenant_id` = '{tenant_id}' OR `tab{doctype}`.`tenant_id` = 'SYSTEM' OR `tab{doctype}`.`tenant_id` IS NULL)"
+    return f"(`tab{doctype}`.`tenant_id` = {frappe.db.escape(tenant_id)} OR `tab{doctype}`.`tenant_id` = 'SYSTEM' OR `tab{doctype}`.`tenant_id` IS NULL)"
 
 
-def setup_user_tenant():
+def setup_user_tenant(app=None):
     """Complete setup for user-tenant linking. Adds Custom Field to User and sets Administrator tenant."""
     # 1. Add Custom Field to User
     if not frappe.db.exists("Custom Field", "User-tenant_id"):

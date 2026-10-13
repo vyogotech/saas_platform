@@ -9,7 +9,7 @@ readme = "README.md"
 dynamic = ["version"]
 dependencies = [
     # "frappe~=15.0.0" # Installed and managed by bench.
-    "sqlglot>=20.0.0",
+    "sqlglot>=30.12,<31",  # same range as frappe v16 (sql-metadata); rewriter needs the "from_" arg key
 ]
 
 [build-system]

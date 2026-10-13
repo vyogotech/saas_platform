@@ -1,29 +1,11 @@
 __version__ = "0.0.1"
 
-# Monkey-patch Database._transform_query for transparent tenant SQL rewriting
-try:
-    from frappe.database.database import Database
-    from saas_platform.utils.sql_rewriter import rewrite_sql_for_tenant
+# Tenant isolation patches. No try/except: if these fail to install, tenant
+# queries would run unfiltered, so the app must fail loudly instead.
+from saas_platform.utils.sql_rewriter import install_db_patch
+from saas_platform.utils.naming import patch_frappe_naming
 
-    if not getattr(Database, "_saas_platform_patched", False):
-        _orig_transform_query = Database._transform_query
-
-        def _tenant_aware_transform_query(self, query, values):
-            query, values = _orig_transform_query(self, query, values)
-            if isinstance(query, str):
-                query = rewrite_sql_for_tenant(query)
-            return query, values
-
-        Database._transform_query = _tenant_aware_transform_query
-        Database._saas_platform_patched = True
-except Exception:
-    pass
-
-# Patch frappe.model.naming for tenant-isolated tabSeries counters
-try:
-    from saas_platform.utils.naming import patch_frappe_naming
-    patch_frappe_naming()
-except Exception:
-    pass
+install_db_patch()
+patch_frappe_naming()
 
 

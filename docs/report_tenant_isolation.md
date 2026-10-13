@@ -33,293 +33,76 @@ While document creation ([doc_events: before_insert](file:///Users/varkrish/pers
 
 ---
 
-## 3. Recommended Architecture: Defense-in-Depth
-
-The solution employs a multi-tiered defense:
+## 3. Architecture: Defense-in-Depth
 
 ```mermaid
 flowchart TD
-    A[Client Request: View Report] --> B[Report Runner: frappe.desk.query_report.run]
-    B --> C[Layer 2: Force filters.company & filters.tenant_id]
-    C --> D[Report Execution: Query Report SQL or Script Report Python]
-    D --> E[frappe.db.sql Call]
-    E --> F{Session != Administrator & Has tenant_id?}
-    F -- No --> G[Execute Raw SQL Unchanged]
-    F -- Yes --> H[Layer 1: AST Query Rewriter: Database._transform_query]
-    H --> I[Parse SQL into AST via sqlglot]
-    I --> J[Identify tab* Tables with tenant_id Column]
-    J --> K[Inject table_alias.tenant_id IN tenant_id, 'SYSTEM']
-    K --> L[Execute Transformed SQL on Database]
+    A[Any frappe.db.sql call: Query Report, Script Report, export, prepared report, ORM] --> B{SELECT / WITH?}
+    B -- No --> Z[Execute unchanged]
+    B -- Yes --> C{Scope}
+    C -- Administrator, platform staff, migrate/install --> Z
+    C -- Guest or user without tenant --> D[Scope = SYSTEM rows only]
+    C -- Tenant user --> E[Scope = own tenant + SYSTEM]
+    D --> F[sqlglot AST rewrite, cached]
+    E --> F
+    F -- Parsed --> G[Execute scoped SQL]
+    F -- Parse failure on a tenant table / RIGHT or FULL JOIN --> X[TenantIsolationError: fail closed]
 ```
 
-### Layer 1: AST SQL Query Rewriter (Database Driver Hook)
-Intercept every raw SQL query executed via `frappe.db.sql` by hooking [Database._transform_query](file:///Users/varkrish/personal/1frappe_ecosystem/frappe/frappe/database/database.py#L188-L189). 
+### Layer 1: AST SQL rewriter (`utils/sql_rewriter.py`)
+`install_db_patch()` wraps `Database._transform_query`. It runs at app import and again in `before_request` / `before_job` (idempotent), so every web and background worker is covered.
 
-Using `sqlglot` (a pure-Python, zero-dependency SQL parser), the query AST is inspected:
-- Identify every table expression (`tab<DocType>`).
-- If the table belongs to tenant-isolated DocTypes (not in `SYSTEM_TABLES`):
-  - For `FROM` and `INNER JOIN` tables: Append `(table.tenant_id = '{tenant_id}' OR table.tenant_id = 'SYSTEM' OR table.tenant_id IS NULL)` to the `WHERE` clause.
-  - For `LEFT JOIN` / `RIGHT JOIN`: Append the condition to the `JOIN ... ON` clause to preserve outer join NULL semantics.
-- With LRU caching on normalized query templates, AST rewriting overhead is negligible (< 0.1ms).
+- **Tenant scope** comes from `utils/tenant.get_tenant_id()`. The `on_session_creation` hook is the only writer of `session.data["tenant_id"]` and saves the session immediately. Requests without it (background jobs, older sessions) fall back to `User.tenant_id`, memoised per user on `frappe.local`.
+- **Scoped tables** are those that actually have the raw `tenant_id` column (read from `information_schema`, cached in Redis under a versioned key, cleared in `after_migrate`), minus `SYSTEM_TABLES`. Tables without the column, such as `tabSeries`, are never touched.
+- **Predicate** `` (`alias`.tenant_id = '<tenant>' OR `alias`.tenant_id = 'SYSTEM') ``, built as sqlglot AST nodes (no string interpolation, so no SQL injection). `FROM` and inner-join tables get it in `WHERE`; `LEFT JOIN` tables get it in `ON`. No `IS NULL` branch: it would match the NULL-extended rows of outer joins.
+- **Refused:** `RIGHT` / `FULL JOIN` on tenant tables (a filter in `ON` does not restrict the preserved side), and any statement on a tenant table that sqlglot cannot parse. Both raise `TenantIsolationError` and log the query.
+- **Placeholders** (`%s`, `%(name)s`) are masked before parsing and restored afterwards, so the cache key is the query template and hit rates stay high.
 
-### Layer 2: ERPNext Company Locking via User Permission
-When a [Tenant](file:///Users/varkrish/personal/1frappe_ecosystem/saas_platform/saas_platform/saas_platform/doctype/tenant/tenant.py#L10) is created, [create_company](file:///Users/varkrish/personal/1frappe_ecosystem/saas_platform/saas_platform/saas_platform/doctype/tenant/tenant.py#L105-L138) provisions a dedicated company for that tenant.
-- Create a `User Permission` for the tenant admin linking them to their specific `Company`.
-- This ensures that standard ERPNext reports (General Ledger, Trial Balance, Stock Balance, Profit & Loss) default to and lock their Company filter to the tenant's company in the Desk UI.
+### Layer 2: Company User Permission
+Each tenant user gets a `User Permission` on their tenant's `Company`: the admin at provisioning, and later users through the `User` `after_insert` hook. ERPNext reports apply it as a match condition, and `validate_filters_permissions` checks it for server-declared Link filters.
 
-### Layer 3: Report Interceptor & Query Report Parameterization
-- Hook `frappe.desk.query_report.run` to guarantee `filters["tenant_id"] = frappe.session.get("tenant_id")` and `filters["company"] = user_company`.
-- Custom Query Reports can optionally use `%(tenant_id)s` explicitly, but Layer 1 ensures safety even if omitted.
+### Layer 3: Document access by name
+The `has_permission` hook (`permissions.has_permission`) denies a loaded document whose `tenant_id` belongs to another tenant (`frappe.client`, form loads, `get_doc`).
+
+### Data tagging
+`tenant_id` is a raw `ALTER TABLE` column, so Frappe's ORM never writes it. `persist_tenant_id` (`after_insert`, `on_update`, `on_update_after_submit`) writes it to the row and its child rows with `frappe.db.set_value`. During provisioning, `acting_tenant()` tags everything created with the tenant's Company (chart of accounts, cost centers, warehouses).
+
+### Subscriptions: two levels
+`tabSubscription` holds both levels, so it is tenant-filtered like any other table:
+
+| Level | What | `tenant_id` | Visible to |
+| :--- | :--- | :--- | :--- |
+| 1. Platform lease | Our Customer, Subscription and invoices per tenant; everything under the platform Company | `PLATFORM` | Administrator and platform staff only |
+| 2. Tenant billing | Subscriptions, plans and invoices a tenant creates for its own customers | the tenant's id | That tenant |
+
+- `PLATFORM` is never matched by the tenant scope (`own OR 'SYSTEM'`). `SYSTEM` stays for reference data shared by everyone.
+- Documents created by Administrator or the scheduler (subscription invoices, for example) inherit the tenant of their `company`. The platform Company is tagged `PLATFORM`, so level-1 invoices stay hidden and a tenant's scheduled level-2 invoices stay theirs.
+- The platform Company is `saas_platform_company` in site config, or the global default company.
+- `patches/tag_platform_records` tags existing level-1 records on upgrade.
+
+### Tenant roles (`utils/roles.py`)
+System Manager cannot be scoped to a tenant: what it adds on top of data access acts site-wide. Cloning its permissions would need Custom DocPerms on every DocType, which freezes them against upstream permission changes. Instead:
+
+- **Tenant Admin Role Profile**: every desk role except those that can create, write or delete a site-wide DocType (`PLATFORM_DOCTYPES`: schema, code, global config and triggers, identity, platform). Derived from DocPerm / Custom DocPerm and rebuilt in `after_migrate`, so roles from new apps are picked up without a hand-kept list. Tenant admins are provisioned with this profile.
+- **Tenant User Manager** role (in the profile): read/write/create on User, including permlevel 1 (`roles`, `role_profiles`). Scoped by a tenant-only User list filter, the `has_permission` hook (also denying platform `SYSTEM` users such as Administrator), and `validate_tenant_user`, which allows only own-tenant users and only roles from the Tenant Admin profile.
 
 ---
 
-## 4. Implementation Blueprint
+## 4. Known Limits
 
-### 1. Add `sqlglot` Dependency
-
-Update [pyproject.toml](file:///Users/varkrish/personal/1frappe_ecosystem/saas_platform/pyproject.toml):
-
-```toml
-dependencies = [
-    "sqlglot>=20.0.0",
-]
-```
-
----
-
-### 2. Create the SQL Rewriter Module
-
-File: `saas_platform/saas_platform/utils/sql_rewriter.py`
-
-```python
-"""
-SQL AST Rewriter for Multi-Tenant Data Isolation
-Dynamically injects tenant_id predicates into SQL queries executed by frappe.db.sql
-"""
-
-import functools
-import sqlglot
-from sqlglot import exp
-import frappe
-
-# Tables exempt from tenant filtering
-SYSTEM_TABLES = {
-    "tabUser", "tabRole", "tabDocType", "tabDocField", "tabDocPerm",
-    "tabModule Def", "tabTenant", "tabPlan", "tabSubscription Plan",
-    "tabSubscription", "tabSubscription Plan Detail", "tabSessions",
-    "tabSystem Settings", "tabWebsite Settings", "tabError Log",
-    "tabActivity Log", "tabVersion", "tabCustom Field", "tabProperty Setter",
-    "tabSingles", "tabInstalled Applications", "tabPatch Log"
-}
-
-
-@functools.lru_cache(maxsize=2048)
-def _rewrite_query_cached(sql: str, tenant_id: str) -> str:
-    """
-    Parse SQL AST using sqlglot and inject tenant_id condition.
-    Cached by query string and tenant_id for high performance.
-    """
-    parsed = sqlglot.parse_one(sql, read="mysql")
-
-    # Traverse all SELECT expressions (including subqueries, CTEs, and unions)
-    for select in parsed.find_all(exp.Select):
-        from_table = select.args.get("from")
-        tables_to_filter = []
-
-        if from_table and isinstance(from_table.this, exp.Table):
-            tables_to_filter.append((from_table.this, False))
-
-        for join in select.args.get("joins", []):
-            if isinstance(join.this, exp.Table):
-                # Detect outer joins to preserve outer null semantics
-                is_outer = (join.side or "").upper() in ("LEFT", "RIGHT", "FULL")
-                tables_to_filter.append((join, is_outer))
-
-        for item, is_outer in tables_to_filter:
-            tbl = item.this if is_outer else item
-            tbl_name = tbl.name
-            alias = tbl.alias or tbl_name
-
-            # Skip system tables or non-frappe tables
-            if not tbl_name.startswith("tab") or tbl_name in SYSTEM_TABLES:
-                continue
-
-            tenant_condition = sqlglot.parse_one(
-                f"({alias}.tenant_id = '{tenant_id}' OR {alias}.tenant_id = 'SYSTEM' OR {alias}.tenant_id IS NULL)"
-            )
-
-            if is_outer:
-                # Append condition to JOIN ... ON
-                existing_on = item.args.get("on")
-                item.set("on", exp.and_(existing_on, tenant_condition) if existing_on else tenant_condition)
-            else:
-                # Append condition to WHERE
-                select.where(tenant_condition, copy=False)
-
-    return parsed.sql(dialect="mysql")
-
-
-def rewrite_sql_for_tenant(query: str) -> str:
-    """
-    Inspect execution context and rewrite query if running under a tenant session.
-    """
-    # 1. Bypass check: Administrator, schema migrations, installation, or explicit flags
-    if (
-        frappe.flags.in_migrate
-        or frappe.flags.in_install
-        or frappe.flags.ignore_tenant_filter
-        or frappe.session.user == "Administrator"
-    ):
-        return query
-
-    # 2. Check session tenant
-    tenant_id = frappe.session.get("tenant_id")
-    if not tenant_id or tenant_id == "SYSTEM":
-        return query
-
-    # 3. Only rewrite SELECT and CTE queries (INSERT/UPDATE handled via doc_events)
-    stripped = query.strip().lstrip("(").lower()
-    if not (stripped.startswith("select") or stripped.startswith("with")):
-        return query
-
-    try:
-        return _rewrite_query_cached(query, tenant_id)
-    except Exception as e:
-        frappe.log_error(
-            f"Failed to rewrite query for tenant {tenant_id}: {str(e)}\nOriginal: {query[:300]}",
-            "Tenant SQL Rewriter Error"
-        )
-        return query
-```
-
----
-
-### 3. Register the Database Driver Patch
-
-File: `saas_platform/saas_platform/__init__.py`
-
-```python
-import frappe
-from frappe.database.database import Database
-from saas_platform.utils.sql_rewriter import rewrite_sql_for_tenant
-
-# Monkey-patch Database._transform_query
-_orig_transform_query = Database._transform_query
-
-def _tenant_aware_transform_query(self, query, values):
-    query, values = _orig_transform_query(self, query, values)
-    if isinstance(query, str):
-        query = rewrite_sql_for_tenant(query)
-    return query, values
-
-Database._transform_query = _tenant_aware_transform_query
-```
-
----
-
-### 4. Create Company User Permission on Tenant Provisioning
-
-In [saas_platform/saas_platform/doctype/tenant/tenant.py](file:///Users/varkrish/personal/1frappe_ecosystem/saas_platform/saas_platform/saas_platform/doctype/tenant/tenant.py), update `setup_admin_user` to create a `User Permission` for the tenant's `Company`:
-
-```python
-    def setup_admin_user(self):
-        """Create or update admin user for this tenant and bind company permission"""
-        try:
-            # ... existing user creation logic ...
-
-            # Enforce company user permission
-            company_name = self.tenant_name
-            if not frappe.db.exists("User Permission", {
-                "user": self.admin_email,
-                "allow": "Company",
-                "for_value": company_name
-            }):
-                user_perm = frappe.get_doc({
-                    "doctype": "User Permission",
-                    "user": self.admin_email,
-                    "allow": "Company",
-                    "for_value": company_name,
-                    "is_default": 1
-                })
-                user_perm.insert(ignore_permissions=True)
-                frappe.db.commit()
-                frappe.log(f"Linked User Permission Company={company_name} to {self.admin_email}")
-
-        except Exception as e:
-            frappe.log_error(f"Failed to setup user permissions for tenant {self.tenant_id}: {str(e)}")
-```
-
----
-
-### 5. Report Runner Interceptor Hook
-
-File: `saas_platform/saas_platform/utils/report_interceptor.py`
-
-```python
-import frappe
-from frappe.desk.query_report import run as original_run
-
-@frappe.whitelist()
-@frappe.read_only()
-def tenant_aware_report_run(
-    report_name: str,
-    filters: str | dict | None = None,
-    user: str | None = None,
-    ignore_prepared_report: bool = False,
-    custom_columns: str | list | None = None,
-    is_tree: bool = False,
-    parent_field: str | None = None,
-    are_default_filters: bool = True,
-    js_filters: str | list | None = None,
-):
-    if isinstance(filters, str):
-        filters = frappe.parse_json(filters) or {}
-    elif filters is None:
-        filters = {}
-
-    user = user or frappe.session.user
-    if user != "Administrator":
-        tenant_id = frappe.session.get("tenant_id")
-        if tenant_id:
-            filters["tenant_id"] = tenant_id
-
-            # If user has a tenant company, force company filter
-            user_company = frappe.db.get_value("Company", {"tenant_id": tenant_id}, "name")
-            if user_company:
-                filters["company"] = user_company
-
-    return original_run(
-        report_name=report_name,
-        filters=filters,
-        user=user,
-        ignore_prepared_report=ignore_prepared_report,
-        custom_columns=custom_columns,
-        is_tree=is_tree,
-        parent_field=parent_field,
-        are_default_filters=are_default_filters,
-        js_filters=js_filters,
-    )
-```
-
-In [saas_platform/saas_platform/hooks.py](file:///Users/varkrish/personal/1frappe_ecosystem/saas_platform/saas_platform/hooks.py#L189-L194):
-
-```python
-override_whitelisted_methods = {
-    "frappe.desk.query_report.run": "saas_platform.utils.report_interceptor.tenant_aware_report_run"
-}
-```
+- Only `SELECT` / `WITH` statements are scoped. Raw `UPDATE`, `DELETE` and `INSERT ... SELECT` are not.
+- Tenant admins do not get `System Manager`: Query Reports, Server Scripts, System Console and Custom Fields bypass isolation. They get the Tenant Admin profile instead.
+- `sqlglot>=30.12,<31` (Frappe v16's own range). The rewriter needs the `from_` arg key, introduced in sqlglot 28.
 
 ---
 
 ## 5. Verification & Testing
 
-| Test Case | Scenario | Expected Behavior |
+| Suite | Where | Covers |
 | :--- | :--- | :--- |
-| **Simple Query Report** | `SELECT name, customer_name FROM tabCustomer` executed by Tenant A. | Rewritten to `SELECT ... FROM tabCustomer WHERE (tabCustomer.tenant_id = 'tenant-a' OR ...)`. Tenant B's customers are not returned. |
-| **Multi-Table Join Report** | `SELECT si.name, sii.item_code FROM tabSales Invoice si JOIN tabSales Invoice Item sii ON ...` | Both `si` and `sii` receive tenant conditions in `WHERE` / `ON`. |
-| **Aggregated Script Report** | General Ledger or Trial Balance (`SUM(debit)` grouped by `account`). | Underlying `tabGL Entry` query filtered at SQL level; aggregates accurately represent only Tenant A's figures. |
-| **Administrator Bypass** | Administrator runs any Query or Script Report. | Query executed without modifications; sees all records across all tenants. |
-| **Schema Migration** | `bench migrate` runs patches. | `frappe.flags.in_migrate` is `True`; AST rewriter bypassed completely. |
+| `utils/test_sql_rewriter.py` | `bench run-tests --module saas_platform.utils.test_sql_rewriter` | Joins, subqueries, CTEs, unions, aggregates, placeholders, injection escaping, RIGHT JOIN refusal, fail-closed parsing, tables without the column, live SQLite isolation |
+| End-to-end on an SNE site (49 checks) | Tenants provisioned through `Tenant` | Data tagging (parent and child rows), Query Report, raw aggregates, `get_list`, General Ledger with real GL entries, document access by name, Guest scope, HTTP login across requests, both subscription levels, scheduler inheritance, Tenant Admin profile and Tenant User Manager limits |
+| Standard report sweep | 20 ERPNext reports run as a tenant user | 416 of 420 queries rewritten, 0 parse failures, 0 tenant tables left unscoped; p50 overhead 0.007 ms, p95 1.2 ms |
 
 ---
 
@@ -350,7 +133,6 @@ While MariaDB lacks native table-level RLS policies, **PostgreSQL natively suppo
    USING (
        tenant_id = NULLIF(current_setting('app.current_tenant', true), '')
        OR tenant_id = 'SYSTEM'
-       OR tenant_id IS NULL
        OR current_setting('app.is_admin', true) = '1'
    );
    ```
@@ -361,7 +143,7 @@ While MariaDB lacks native table-level RLS policies, **PostgreSQL natively suppo
        if frappe.session.user == "Administrator":
            frappe.db.sql("SET LOCAL app.is_admin = '1'")
        else:
-           tenant_id = frappe.session.get("tenant_id")
+           tenant_id = get_tenant_id()
            if tenant_id:
                frappe.db.sql("SET LOCAL app.current_tenant = %s", (tenant_id,))
    ```
@@ -379,17 +161,19 @@ Thank you for raising this critical point. You have identified the primary hurdl
 
 Post-filtering results in Python memory is insufficient because it breaks aggregated queries (`SUM`, `AVG`, `GROUP BY`) and pagination (`LIMIT`/`OFFSET`).
 
-We are adopting a two-layer solution:
+We are adopting a layered solution:
 
-1. **AST-Based SQL Rewriting at the Driver Layer:**
-   We intercept `Database._transform_query` using `sqlglot`. For any non-Administrator tenant session, the AST rewriter identifies all multi-tenant tables (`tab*`) in the query (including subqueries, joins, and CTEs) and automatically injects:
-   `(table_alias.tenant_id = '<tenant_id>' OR table_alias.tenant_id = 'SYSTEM' OR table_alias.tenant_id IS NULL)`
-   - Outer joins (`LEFT`/`RIGHT JOIN`) have predicates appended to `ON` clauses to preserve outer join semantics.
-   - Inner joins and `FROM` tables append to `WHERE`.
-   - LRU query template caching ensures negligible execution overhead (<0.1ms).
+1. **AST-based SQL rewriting at the driver layer:**
+   We wrap `Database._transform_query` and use `sqlglot` to add a tenant predicate to every table that carries `tenant_id`, including subqueries, joins and CTEs:
+   `(alias.tenant_id = '<tenant_id>' OR alias.tenant_id = 'SYSTEM')`
+   - `LEFT JOIN` tables get the predicate in `ON`; `FROM` and inner-join tables get it in `WHERE`.
+   - It fails closed: a query on a tenant table that cannot be parsed, or a `RIGHT`/`FULL JOIN`, is refused rather than run unfiltered.
+   - Rewrites are cached by query template (p50 overhead of a few microseconds).
 
-2. **Tenant Company Binding:**
-   For standard ERPNext accounting reports that filter by `Company`, each tenant user is assigned a `User Permission` for their auto-provisioned `Company`, and `frappe.desk.query_report.run` ensures the `company` filter cannot be cleared or tampered with.
+2. **Tenant Company binding:**
+   Each tenant user gets a `User Permission` on their tenant's `Company`, which ERPNext reports apply to their company filters.
+
+3. **Document-level check:** a `has_permission` hook denies access by name to other tenants' documents.
 
 Full architectural documentation and code blueprint are available in `docs/report_tenant_isolation.md`.
 ```

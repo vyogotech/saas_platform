@@ -103,7 +103,14 @@ after_app_install = "saas_platform.patches.add_tenant_id_to_all_tables.execute"
 # Also ensure setup runs after app install to catch any missed initialization
 after_app_install = [
     "saas_platform.patches.add_tenant_id_to_all_tables.execute",
-    "saas_platform.utils.tenant.setup_user_tenant"
+    "saas_platform.utils.tenant.setup_user_tenant",
+    "saas_platform.utils.roles.sync_tenant_roles",
+]
+
+# Rebuild the Tenant Admin role profile (new apps bring new roles and DocTypes)
+after_migrate = [
+    "saas_platform.utils.sql_rewriter.clear_tenant_tables_cache",
+    "saas_platform.utils.roles.sync_tenant_roles",
 ]
 
 # Integration Cleanup
@@ -129,9 +136,10 @@ after_app_install = [
 #     "*": "saas_platform.permissions.get_tenant_query",
 # }
 
-# has_permission = {
-#     "*": "saas_platform.permissions.has_permission",
-# }
+# Document-level tenant check (frappe.get_doc / frappe.client / form loads by name)
+has_permission = {
+    "*": "saas_platform.permissions.has_permission",
+}
 
 # DocType Class
 # ---------------
@@ -151,7 +159,16 @@ doc_events = {
         "before_insert": "saas_platform.utils.set_tenant_id",
         "before_naming": "saas_platform.utils.naming.namespace_naming_series",
         "before_save": "saas_platform.utils.naming.set_display_number",
-    }
+        # tenant_id is a raw column the ORM never writes; persist it on the row and child rows
+        "after_insert": "saas_platform.utils.tenant.persist_tenant_id",
+        "on_update": "saas_platform.utils.tenant.persist_tenant_id",
+        "on_update_after_submit": "saas_platform.utils.tenant.persist_tenant_id",
+    },
+    # Users created inside a tenant get its Company User Permission
+    "User": {
+        "validate": "saas_platform.utils.roles.validate_tenant_user",
+        "after_insert": "saas_platform.utils.tenant.on_user_insert",
+    },
 }
 
 # Post-login hook to set tenant_id in session
@@ -190,11 +207,11 @@ permission_query_conditions = {
 
 # Overriding Methods
 # ------------------------------
-
-override_whitelisted_methods = {
-    "frappe.desk.query_report.run": "saas_platform.utils.report_interceptor.tenant_aware_report_run"
-}
-
+#
+# override_whitelisted_methods = {
+# 	"frappe.desk.doctype.event.event.get_events": "saas_platform.event.get_events"
+# }
+#
 # each overriding function accepts a `data` argument;
 # generated from the base implementation of the doctype dashboard,
 # along with any modifications made in other Frappe apps
@@ -213,12 +230,13 @@ override_whitelisted_methods = {
 
 # Request Events
 # ----------------
-# before_request = ["saas_platform.utils.before_request"]
+# Guarantee the tenant SQL rewriter is installed in every web and background worker
+before_request = ["saas_platform.utils.sql_rewriter.install_db_patch"]
 # after_request = ["saas_platform.utils.after_request"]
 
 # Job Events
 # ----------
-# before_job = ["saas_platform.utils.before_job"]
+before_job = ["saas_platform.utils.sql_rewriter.install_db_patch"]
 # after_job = ["saas_platform.utils.after_job"]
 
 # User Data Protection
