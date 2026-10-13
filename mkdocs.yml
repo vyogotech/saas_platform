@@ -14,6 +14,8 @@ nav:
   - Installation: installation.md
   - Architecture: architecture.md
   - Implementation: implementation.md
+  - Report Isolation: report_tenant_isolation.md
+  - Naming & Singletons: tenant_naming_and_singletons.md
   - Microservice Integration: integration.md
 
 markdown_extensions:

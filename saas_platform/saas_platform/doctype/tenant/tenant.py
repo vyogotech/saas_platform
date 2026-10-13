@@ -173,6 +173,24 @@ class Tenant(Document):
                 frappe.log(
                     f"Created admin user: {self.admin_email} for tenant: {self.tenant_id}")
 
+            # Bind tenant's Company to admin user via User Permission
+            company_name = getattr(self, "company", None) or frappe.db.get_value("Company", {"tenant_id": self.tenant_id}, "name") or self.tenant_name
+            if frappe.db.exists("Company", company_name) and not frappe.db.exists("User Permission", {
+                "user": self.admin_email,
+                "allow": "Company",
+                "for_value": company_name
+            }):
+                user_perm = frappe.get_doc({
+                    "doctype": "User Permission",
+                    "user": self.admin_email,
+                    "allow": "Company",
+                    "for_value": company_name,
+                    "is_default": 1
+                })
+                user_perm.insert(ignore_permissions=True)
+                frappe.db.commit()
+                frappe.log(f"Created Company User Permission for {self.admin_email}: {company_name}")
+
         except Exception as e:
             frappe.log_error(
                 f"Failed to setup admin user for tenant {self.tenant_id}: {str(e)}")

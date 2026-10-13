@@ -187,11 +187,11 @@ permission_query_conditions = {
 
 # Overriding Methods
 # ------------------------------
-#
-# override_whitelisted_methods = {
-# 	"frappe.desk.doctype.event.event.get_events": "saas_platform.event.get_events"
-# }
-#
+
+override_whitelisted_methods = {
+    "frappe.desk.query_report.run": "saas_platform.utils.report_interceptor.tenant_aware_report_run"
+}
+
 # each overriding function accepts a `data` argument;
 # generated from the base implementation of the doctype dashboard,
 # along with any modifications made in other Frappe apps
