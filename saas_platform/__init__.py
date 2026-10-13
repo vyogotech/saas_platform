@@ -19,3 +19,11 @@ try:
 except Exception:
     pass
 
+# Patch frappe.model.naming for tenant-isolated tabSeries counters
+try:
+    from saas_platform.utils.naming import patch_frappe_naming
+    patch_frappe_naming()
+except Exception:
+    pass
+
+

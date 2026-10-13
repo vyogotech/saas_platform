@@ -74,10 +74,11 @@ app_license = "mit"
 # ----------
 
 # add methods and filters to jinja environment
-# jinja = {
-# 	"methods": "saas_platform.utils.jinja_methods",
-# 	"filters": "saas_platform.utils.jinja_filters"
-# }
+jinja = {
+    "methods": [
+        "saas_platform.utils.naming.get_clean_display_name",
+    ]
+}
 
 # Installation
 # ------------
@@ -144,10 +145,12 @@ after_app_install = [
 # ---------------
 # Hook on document methods and events
 
-# Auto-populate tenant_id on all documents before insert
+# Auto-populate tenant_id on all documents before insert, namespace naming_series, and set clean display_number
 doc_events = {
     "*": {
         "before_insert": "saas_platform.utils.set_tenant_id",
+        "before_naming": "saas_platform.utils.naming.namespace_naming_series",
+        "before_save": "saas_platform.utils.naming.set_display_number",
     }
 }
 
