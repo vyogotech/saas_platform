@@ -1,0 +1,1256 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../implementation/">
+      
+      
+        <link rel="next" href="../tenant_naming_and_singletons/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Report Isolation - SaaS Platform</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="deep-orange" data-md-color-accent="deep-orange">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#multi-tenant-report-isolation-architecture" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="SaaS Platform" class="md-header__button md-logo" aria-label="SaaS Platform" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            SaaS Platform
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Report Isolation
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../installation/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Installation
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../architecture/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Architecture
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../implementation/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Implementation
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    <li class="md-tabs__item md-tabs__item--active">
+      <a href="./" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Report Isolation
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../tenant_naming_and_singletons/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Naming & Singletons
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../integration/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Microservice Integration
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="SaaS Platform" class="md-nav__button md-logo" aria-label="SaaS Platform" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    SaaS Platform
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../implementation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Implementation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Report Isolation
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Report Isolation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-problem-overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Problem Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-solution-evaluation-matrix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Solution Evaluation Matrix
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-architecture-defense-in-depth" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Architecture: Defense-in-Depth
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Architecture: Defense-in-Depth">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#layer-1-ast-sql-rewriter-utilssql_rewriterpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Layer 1: AST SQL rewriter (utils/sql_rewriter.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#layer-2-company-user-permission" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Layer 2: Company User Permission
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#layer-3-document-access-by-name" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Layer 3: Document access by name
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#data-tagging" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data tagging
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#subscriptions-two-levels" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Subscriptions: two levels
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tenant-roles-utilsrolespy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tenant roles (utils/roles.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-known-limits" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Known Limits
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-verification-testing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Verification &amp; Testing
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-postgresql-support-dialect-handling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. PostgreSQL Support &amp; Dialect Handling
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. PostgreSQL Support &amp; Dialect Handling">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#a-automatic-multi-dialect-transpilation-in-ast-rewriter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A. Automatic Multi-Dialect Transpilation in AST Rewriter
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b-native-postgresql-row-level-security-rls-alternative" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B. Native PostgreSQL Row-Level Security (RLS) Alternative
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-recommended-response-to-github-issue-1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Recommended Response to GitHub Issue #1
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tenant_naming_and_singletons/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Naming & Singletons
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Microservice Integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-problem-overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Problem Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-solution-evaluation-matrix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Solution Evaluation Matrix
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-architecture-defense-in-depth" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Architecture: Defense-in-Depth
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Architecture: Defense-in-Depth">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#layer-1-ast-sql-rewriter-utilssql_rewriterpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Layer 1: AST SQL rewriter (utils/sql_rewriter.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#layer-2-company-user-permission" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Layer 2: Company User Permission
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#layer-3-document-access-by-name" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Layer 3: Document access by name
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#data-tagging" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data tagging
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#subscriptions-two-levels" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Subscriptions: two levels
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tenant-roles-utilsrolespy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tenant roles (utils/roles.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-known-limits" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Known Limits
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-verification-testing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Verification &amp; Testing
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-postgresql-support-dialect-handling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. PostgreSQL Support &amp; Dialect Handling
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. PostgreSQL Support &amp; Dialect Handling">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#a-automatic-multi-dialect-transpilation-in-ast-rewriter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A. Automatic Multi-Dialect Transpilation in AST Rewriter
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b-native-postgresql-row-level-security-rls-alternative" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B. Native PostgreSQL Row-Level Security (RLS) Alternative
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-recommended-response-to-github-issue-1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Recommended Response to GitHub Issue #1
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="multi-tenant-report-isolation-architecture">Multi-Tenant Report Isolation Architecture</h1>
+<blockquote>
+<p><strong>Context:</strong> Solution design for <a href="https://github.com/vyogotech/saas_platform/issues/1">GitHub Issue #1: Inject tenant_id filtering condition into every report</a> on <code>vyogotech/saas_platform</code>.</p>
+</blockquote>
+<hr />
+<h2 id="1-problem-overview">1. Problem Overview</h2>
+<p>In <code>saas_platform</code>, multi-tenancy is designed around a <strong>shared-database, shared-schema</strong> architecture where all tenant records are co-located in the same database tables and partitioned by a <code>tenant_id</code> column.</p>
+<p>While document creation (<a href="file:///Users/varkrish/personal/1frappe_ecosystem/saas_platform/saas_platform/hooks.py#L148-L152">doc_events: before_insert</a>) and list views (<a href="file:///Users/varkrish/personal/1frappe_ecosystem/saas_platform/saas_platform/hooks.py#L158-L160">permission_query_conditions</a>) enforce tenant isolation for ORM operations, <strong>reports remain a major security vulnerability</strong>:</p>
+<ol>
+<li><strong>Query Reports (<code>report_type = "Query Report"</code>):</strong> Run raw SQL statements directly via <a href="file:///Users/varkrish/personal/1frappe_ecosystem/frappe/frappe/core/doctype/report/report.py#L180-L192">Report.execute_query_report</a> calling <code>frappe.db.sql(self.query, filters)</code>. Standard Frappe does not inject <code>permission_query_conditions</code> into raw SQL queries.</li>
+<li><strong>Script Reports (<code>report_type = "Script Report"</code>):</strong> Standard ERPNext reports (General Ledger, Accounts Receivable/Payable, Trial Balance, Stock Balance, Profit &amp; Loss) and custom reports execute Python <code>execute(filters)</code> methods that run handwritten complex raw SQL across multiple tables (<code>tabGL Entry</code>, <code>tabSales Invoice</code>, <code>tabItem</code>, <code>tabCustomer</code>, etc.). These reports have no awareness of the custom <code>tenant_id</code> column.</li>
+<li><strong>The Aggregation Flaw:</strong> Post-filtering rows in Python memory (e.g., via <a href="file:///Users/varkrish/personal/1frappe_ecosystem/frappe/frappe/desk/query_report.py#L901-L945">get_filtered_data</a>) cannot fix aggregated queries:
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="k">SELECT</span><span class="w"> </span><span class="n">account</span><span class="p">,</span><span class="w"> </span><span class="k">SUM</span><span class="p">(</span><span class="n">debit</span><span class="p">),</span><span class="w"> </span><span class="k">SUM</span><span class="p">(</span><span class="n">credit</span><span class="p">)</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="k">FROM</span><span class="w"> </span><span class="o">`</span><span class="n">tabGL</span><span class="w"> </span><span class="n">Entry</span><span class="o">`</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="k">GROUP</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">account</span>
+</code></pre></div>
+   If executed across all rows, the aggregated values returned by the database are already contaminated with cross-tenant data. Post-filtering cannot untangle these sums. Furthermore, SQL <code>LIMIT</code> and <code>OFFSET</code> pagination will return inaccurate or empty pages.</li>
+</ol>
+<hr />
+<h2 id="2-solution-evaluation-matrix">2. Solution Evaluation Matrix</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Strategy</th>
+<th style="text-align: left;">Mechanism</th>
+<th style="text-align: left;">Feasibility in Frappe / MariaDB</th>
+<th style="text-align: left;">Assessment</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>1. Database-Native Row-Level Security (RLS)</strong></td>
+<td style="text-align: left;">Use MariaDB / PostgreSQL RLS policies with session variables (<code>SET @tenant_id = '...'</code>).</td>
+<td style="text-align: left;">⚠️ <strong>Low on MariaDB</strong> (Native in PostgreSQL only)</td>
+<td style="text-align: left;">PostgreSQL supports <code>CREATE POLICY ... USING (tenant_id = ...)</code>. However, MariaDB (Frappe's default database engine) lacks native table-level RLS policies without converting base tables to views, which breaks <code>bench migrate</code> and DDL schema syncing.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>2. In-Memory Post-Execution Filtering</strong></td>
+<td style="text-align: left;">Filter result rows in Python after query completion.</td>
+<td style="text-align: left;">❌ <strong>Broken</strong></td>
+<td style="text-align: left;">Cannot correct aggregated queries (<code>GROUP BY</code>, <code>SUM</code>), pagination offsets (<code>LIMIT</code>), or queries omitting <code>tenant_id</code> from the <code>SELECT</code> column list. Severe memory leak risk.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>3. AST-Based SQL Query Rewriting at Driver Layer</strong></td>
+<td style="text-align: left;">Intercept <code>Database._transform_query</code> using an AST parser (<code>sqlglot</code>) to dynamically inject <code>tenant_id</code> predicates into <code>WHERE</code> / <code>ON</code> clauses.</td>
+<td style="text-align: left;"><strong>High</strong></td>
+<td style="text-align: left;"><strong>Recommended core solution.</strong> Fully transparent; protects raw SQL, joins, subqueries, and CTEs without touching upstream ERPNext report code.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>4. Company-Level User Permissions</strong></td>
+<td style="text-align: left;">Restrict each tenant's user to their auto-provisioned <code>Company</code> using Frappe's native <code>User Permission</code>.</td>
+<td style="text-align: left;"><strong>High</strong></td>
+<td style="text-align: left;"><strong>Recommended supplementary layer.</strong> Restricts standard ERPNext financial reports that natively filter by <code>company</code>. Insufficient by itself for DocTypes without a <code>company</code> field (e.g. <code>Customer</code>, <code>Item</code>).</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="3-architecture-defense-in-depth">3. Architecture: Defense-in-Depth</h2>
+<pre class="mermaid"><code>flowchart TD
+    A[Any frappe.db.sql call: Query Report, Script Report, export, prepared report, ORM] --&gt; B{SELECT / WITH?}
+    B -- No --&gt; Z[Execute unchanged]
+    B -- Yes --&gt; C{Scope}
+    C -- Administrator, platform staff, migrate/install --&gt; Z
+    C -- Guest or user without tenant --&gt; D[Scope = SYSTEM rows only]
+    C -- Tenant user --&gt; E[Scope = own tenant + SYSTEM]
+    D --&gt; F[sqlglot AST rewrite, cached]
+    E --&gt; F
+    F -- Parsed --&gt; G[Execute scoped SQL]
+    F -- Parse failure on a tenant table / RIGHT or FULL JOIN --&gt; X[TenantIsolationError: fail closed]</code></pre>
+<h3 id="layer-1-ast-sql-rewriter-utilssql_rewriterpy">Layer 1: AST SQL rewriter (<code>utils/sql_rewriter.py</code>)</h3>
+<p><code>install_db_patch()</code> wraps <code>Database._transform_query</code>. It runs at app import and again in <code>before_request</code> / <code>before_job</code> (idempotent), so every web and background worker is covered.</p>
+<ul>
+<li><strong>Tenant scope</strong> comes from <code>utils/tenant.get_tenant_id()</code>. The <code>on_session_creation</code> hook is the only writer of <code>session.data["tenant_id"]</code> and saves the session immediately. Requests without it (background jobs, older sessions) fall back to <code>User.tenant_id</code>, memoised per user on <code>frappe.local</code>.</li>
+<li><strong>Scoped tables</strong> are those that actually have the raw <code>tenant_id</code> column (read from <code>information_schema</code>, cached in Redis under a versioned key, cleared in <code>after_migrate</code>), minus <code>SYSTEM_TABLES</code>. Tables without the column, such as <code>tabSeries</code>, are never touched.</li>
+<li><strong>Predicate</strong> <code>(`alias`.tenant_id = '&lt;tenant&gt;' OR `alias`.tenant_id = 'SYSTEM')</code>, built as sqlglot AST nodes (no string interpolation, so no SQL injection). <code>FROM</code> and inner-join tables get it in <code>WHERE</code>; <code>LEFT JOIN</code> tables get it in <code>ON</code>. No <code>IS NULL</code> branch: it would match the NULL-extended rows of outer joins.</li>
+<li><strong>Refused:</strong> <code>RIGHT</code> / <code>FULL JOIN</code> on tenant tables (a filter in <code>ON</code> does not restrict the preserved side), and any statement on a tenant table that sqlglot cannot parse. Both raise <code>TenantIsolationError</code> and log the query.</li>
+<li><strong>Placeholders</strong> (<code>%s</code>, <code>%(name)s</code>) are masked before parsing and restored afterwards, so the cache key is the query template and hit rates stay high.</li>
+</ul>
+<h3 id="layer-2-company-user-permission">Layer 2: Company User Permission</h3>
+<p>Each tenant user gets a <code>User Permission</code> on their tenant's <code>Company</code>: the admin at provisioning, and later users through the <code>User</code> <code>after_insert</code> hook. ERPNext reports apply it as a match condition, and <code>validate_filters_permissions</code> checks it for server-declared Link filters.</p>
+<h3 id="layer-3-document-access-by-name">Layer 3: Document access by name</h3>
+<p>The <code>has_permission</code> hook (<code>permissions.has_permission</code>) denies a loaded document whose <code>tenant_id</code> belongs to another tenant (<code>frappe.client</code>, form loads, <code>get_doc</code>).</p>
+<h3 id="data-tagging">Data tagging</h3>
+<p><code>tenant_id</code> is a raw <code>ALTER TABLE</code> column, so Frappe's ORM never writes it. <code>persist_tenant_id</code> (<code>after_insert</code>, <code>on_update</code>, <code>on_update_after_submit</code>) writes it to the row and its child rows with <code>frappe.db.set_value</code>. During provisioning, <code>acting_tenant()</code> tags everything created with the tenant's Company (chart of accounts, cost centers, warehouses).</p>
+<h3 id="subscriptions-two-levels">Subscriptions: two levels</h3>
+<p><code>tabSubscription</code> holds both levels, so it is tenant-filtered like any other table:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Level</th>
+<th style="text-align: left;">What</th>
+<th style="text-align: left;"><code>tenant_id</code></th>
+<th style="text-align: left;">Visible to</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">1. Platform lease</td>
+<td style="text-align: left;">Our Customer, Subscription and invoices per tenant; everything under the platform Company</td>
+<td style="text-align: left;"><code>PLATFORM</code></td>
+<td style="text-align: left;">Administrator and platform staff only</td>
+</tr>
+<tr>
+<td style="text-align: left;">2. Tenant billing</td>
+<td style="text-align: left;">Subscriptions, plans and invoices a tenant creates for its own customers</td>
+<td style="text-align: left;">the tenant's id</td>
+<td style="text-align: left;">That tenant</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><code>PLATFORM</code> is never matched by the tenant scope (<code>own OR 'SYSTEM'</code>). <code>SYSTEM</code> stays for reference data shared by everyone.</li>
+<li>Documents created by Administrator or the scheduler (subscription invoices, for example) inherit the tenant of their <code>company</code>. The platform Company is tagged <code>PLATFORM</code>, so level-1 invoices stay hidden and a tenant's scheduled level-2 invoices stay theirs.</li>
+<li>The platform Company is <code>saas_platform_company</code> in site config, or the global default company.</li>
+<li><code>patches/tag_platform_records</code> tags existing level-1 records on upgrade.</li>
+</ul>
+<h3 id="tenant-roles-utilsrolespy">Tenant roles (<code>utils/roles.py</code>)</h3>
+<p>System Manager cannot be scoped to a tenant: what it adds on top of data access acts site-wide. Cloning its permissions would need Custom DocPerms on every DocType, which freezes them against upstream permission changes. Instead:</p>
+<ul>
+<li><strong>Tenant Admin Role Profile</strong>: every desk role except those that can create, write or delete a site-wide DocType (<code>PLATFORM_DOCTYPES</code>: schema, code, global config and triggers, identity, platform). Derived from DocPerm / Custom DocPerm and rebuilt in <code>after_migrate</code>, so roles from new apps are picked up without a hand-kept list. Tenant admins are provisioned with this profile.</li>
+<li><strong>Tenant User Manager</strong> role (in the profile): read/write/create on User, including permlevel 1 (<code>roles</code>, <code>role_profiles</code>). Scoped by a tenant-only User list filter, the <code>has_permission</code> hook (also denying platform <code>SYSTEM</code> users such as Administrator), and <code>validate_tenant_user</code>, which allows only own-tenant users and only roles from the Tenant Admin profile.</li>
+</ul>
+<hr />
+<h2 id="4-known-limits">4. Known Limits</h2>
+<ul>
+<li>Only <code>SELECT</code> / <code>WITH</code> statements are scoped. Raw <code>UPDATE</code>, <code>DELETE</code> and <code>INSERT ... SELECT</code> are not.</li>
+<li>Tenant admins do not get <code>System Manager</code>: Query Reports, Server Scripts, System Console and Custom Fields bypass isolation. They get the Tenant Admin profile instead.</li>
+<li><code>sqlglot&gt;=30.12,&lt;31</code> (Frappe v16's own range). The rewriter needs the <code>from_</code> arg key, introduced in sqlglot 28.</li>
+</ul>
+<hr />
+<h2 id="5-verification-testing">5. Verification &amp; Testing</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Suite</th>
+<th style="text-align: left;">Where</th>
+<th style="text-align: left;">Covers</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>utils/test_sql_rewriter.py</code></td>
+<td style="text-align: left;"><code>bench run-tests --module saas_platform.utils.test_sql_rewriter</code></td>
+<td style="text-align: left;">Joins, subqueries, CTEs, unions, aggregates, placeholders, injection escaping, RIGHT JOIN refusal, fail-closed parsing, tables without the column, live SQLite isolation</td>
+</tr>
+<tr>
+<td style="text-align: left;">End-to-end on an SNE site (49 checks)</td>
+<td style="text-align: left;">Tenants provisioned through <code>Tenant</code></td>
+<td style="text-align: left;">Data tagging (parent and child rows), Query Report, raw aggregates, <code>get_list</code>, General Ledger with real GL entries, document access by name, Guest scope, HTTP login across requests, both subscription levels, scheduler inheritance, Tenant Admin profile and Tenant User Manager limits</td>
+</tr>
+<tr>
+<td style="text-align: left;">Standard report sweep</td>
+<td style="text-align: left;">20 ERPNext reports run as a tenant user</td>
+<td style="text-align: left;">416 of 420 queries rewritten, 0 parse failures, 0 tenant tables left unscoped; p50 overhead 0.007 ms, p95 1.2 ms</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="6-postgresql-support-dialect-handling">6. PostgreSQL Support &amp; Dialect Handling</h2>
+<p>Frappe supports both <strong>MariaDB</strong> and <strong>PostgreSQL</strong> as database backends (<code>frappe.db.db_type</code>). PostgreSQL offers unique capabilities and syntax requirements for multi-tenancy.</p>
+<h3 id="a-automatic-multi-dialect-transpilation-in-ast-rewriter">A. Automatic Multi-Dialect Transpilation in AST Rewriter</h3>
+<p>In Frappe's codebase, many queries use MySQL-style backticks (<code>`tabCustomer`</code>) even when running on PostgreSQL. Our AST rewriter in <code>saas_platform/utils/sql_rewriter.py</code> automatically detects the active dialect (<code>get_db_dialect()</code>):
+- <strong>MariaDB / MySQL:</strong> Emits backticked identifiers (<code>`tabCustomer`.tenant_id</code>).
+- <strong>PostgreSQL:</strong> Automatically transpiles backticks into standard PostgreSQL double-quoted identifiers (<code>"tabCustomer".tenant_id</code>), ensuring 100% dialect correctness.</p>
+<h3 id="b-native-postgresql-row-level-security-rls-alternative">B. Native PostgreSQL Row-Level Security (RLS) Alternative</h3>
+<p>While MariaDB lacks native table-level RLS policies, <strong>PostgreSQL natively supports Row-Level Security at the database kernel level</strong>. For deployments exclusively on PostgreSQL, teams can enable native RLS:</p>
+<ol>
+<li>
+<p><strong>Enable RLS on Multi-Tenant Tables:</strong>
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="k">ALTER</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="ss">"tabSales Invoice"</span><span class="w"> </span><span class="n">ENABLE</span><span class="w"> </span><span class="k">ROW</span><span class="w"> </span><span class="k">LEVEL</span><span class="w"> </span><span class="k">SECURITY</span><span class="p">;</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="k">ALTER</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="ss">"tabSales Invoice"</span><span class="w"> </span><span class="k">FORCE</span><span class="w"> </span><span class="k">ROW</span><span class="w"> </span><span class="k">LEVEL</span><span class="w"> </span><span class="k">SECURITY</span><span class="p">;</span>
+</code></pre></div></p>
+</li>
+<li>
+<p><strong>Define Restrictive Security Policy:</strong>
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">CREATE</span><span class="w"> </span><span class="n">POLICY</span><span class="w"> </span><span class="n">tenant_isolation_policy</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="ss">"tabSales Invoice"</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="k">AS</span><span class="w"> </span><span class="n">RESTRICTIVE</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="k">FOR</span><span class="w"> </span><span class="k">ALL</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="k">TO</span><span class="w"> </span><span class="k">PUBLIC</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="k">USING</span><span class="w"> </span><span class="p">(</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">    </span><span class="n">tenant_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">NULLIF</span><span class="p">(</span><span class="n">current_setting</span><span class="p">(</span><span class="s1">'app.current_tenant'</span><span class="p">,</span><span class="w"> </span><span class="k">true</span><span class="p">),</span><span class="w"> </span><span class="s1">''</span><span class="p">)</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">    </span><span class="k">OR</span><span class="w"> </span><span class="n">tenant_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'SYSTEM'</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">    </span><span class="k">OR</span><span class="w"> </span><span class="n">current_setting</span><span class="p">(</span><span class="s1">'app.is_admin'</span><span class="p">,</span><span class="w"> </span><span class="k">true</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'1'</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="p">);</span>
+</code></pre></div></p>
+</li>
+<li>
+<p><strong>Inject Session Context in Frappe Request Hook:</strong>
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">before_request</span><span class="p">():</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    <span class="k">if</span> <span class="n">frappe</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">user</span> <span class="o">==</span> <span class="s2">"Administrator"</span><span class="p">:</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>        <span class="n">frappe</span><span class="o">.</span><span class="n">db</span><span class="o">.</span><span class="n">sql</span><span class="p">(</span><span class="s2">"SET LOCAL app.is_admin = '1'"</span><span class="p">)</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    <span class="k">else</span><span class="p">:</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>        <span class="n">tenant_id</span> <span class="o">=</span> <span class="n">get_tenant_id</span><span class="p">()</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>        <span class="k">if</span> <span class="n">tenant_id</span><span class="p">:</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>            <span class="n">frappe</span><span class="o">.</span><span class="n">db</span><span class="o">.</span><span class="n">sql</span><span class="p">(</span><span class="s2">"SET LOCAL app.current_tenant = </span><span class="si">%s</span><span class="s2">"</span><span class="p">,</span> <span class="p">(</span><span class="n">tenant_id</span><span class="p">,))</span>
+</code></pre></div></p>
+</li>
+</ol>
+<p><em>Comparison:</em> The AST Query Rewriter provides cross-database compatibility (working identically on MariaDB and Postgres with zero database configuration), while Native PostgreSQL RLS provides kernel-level enforcement for Postgres-only deployments.</p>
+<hr />
+<h2 id="7-recommended-response-to-github-issue-1">7. Recommended Response to GitHub Issue #1</h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>Hi <span class="ni">@szufisher</span>,
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>Thank you for raising this critical point. You have identified the primary hurdle of shared-database multi-tenancy in Frappe: while <span class="sb">`permission_query_conditions`</span> cleanly secures ORM lookups (<span class="sb">`frappe.get_list`</span>), Query Reports and Script Reports execute raw SQL through <span class="sb">`frappe.db.sql`</span>, bypassing permission hooks.
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>Post-filtering results in Python memory is insufficient because it breaks aggregated queries (<span class="sb">`SUM`</span>, <span class="sb">`AVG`</span>, <span class="sb">`GROUP BY`</span>) and pagination (<span class="sb">`LIMIT`</span>/<span class="sb">`OFFSET`</span>).
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>We are adopting a layered solution:
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="k">1.</span> <span class="gs">**AST-based SQL rewriting at the driver layer:**</span>
+<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>   We wrap <span class="sb">`Database._transform_query`</span> and use <span class="sb">`sqlglot`</span> to add a tenant predicate to every table that carries <span class="sb">`tenant_id`</span>, including subqueries, joins and CTEs:
+<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>   <span class="sb">`(alias.tenant_id = '&lt;tenant_id&gt;' OR alias.tenant_id = 'SYSTEM')`</span>
+<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a><span class="w">   </span><span class="k">-</span><span class="w"> </span><span class="sb">`LEFT JOIN`</span> tables get the predicate in <span class="sb">`ON`</span>; <span class="sb">`FROM`</span> and inner-join tables get it in <span class="sb">`WHERE`</span>.
+<a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a><span class="w">   </span><span class="k">-</span><span class="w"> </span>It fails closed: a query on a tenant table that cannot be parsed, or a <span class="sb">`RIGHT`</span>/<span class="sb">`FULL JOIN`</span>, is refused rather than run unfiltered.
+<a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a><span class="w">   </span><span class="k">-</span><span class="w"> </span>Rewrites are cached by query template (p50 overhead of a few microseconds).
+<a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a>
+<a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a><span class="k">2.</span> <span class="gs">**Tenant Company binding:**</span>
+<a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a>   Each tenant user gets a <span class="sb">`User Permission`</span> on their tenant's <span class="sb">`Company`</span>, which ERPNext reports apply to their company filters.
+<a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a>
+<a id="__codelineno-4-19" name="__codelineno-4-19" href="#__codelineno-4-19"></a><span class="k">3.</span> <span class="gs">**Document-level check:**</span> a <span class="sb">`has_permission`</span> hook denies access by name to other tenants' documents.
+<a id="__codelineno-4-20" name="__codelineno-4-20" href="#__codelineno-4-20"></a>
+<a id="__codelineno-4-21" name="__codelineno-4-21" href="#__codelineno-4-21"></a>Full architectural documentation and code blueprint are available in <span class="sb">`docs/report_tenant_isolation.md`</span>.
+</code></pre></div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "content.code.copy", "search.highlight"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

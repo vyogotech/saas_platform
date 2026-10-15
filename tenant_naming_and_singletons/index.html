@@ -1,0 +1,1312 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../report_tenant_isolation/">
+      
+      
+        <link rel="next" href="../integration/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Naming & Singletons - SaaS Platform</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="deep-orange" data-md-color-accent="deep-orange">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#multi-tenant-naming-series-shared-singletons-architecture" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="SaaS Platform" class="md-header__button md-logo" aria-label="SaaS Platform" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            SaaS Platform
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Naming & Singletons
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../installation/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Installation
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../architecture/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Architecture
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../implementation/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Implementation
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../report_tenant_isolation/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Report Isolation
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    <li class="md-tabs__item md-tabs__item--active">
+      <a href="./" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Naming & Singletons
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../integration/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Microservice Integration
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="SaaS Platform" class="md-nav__button md-logo" aria-label="SaaS Platform" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    SaaS Platform
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../implementation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Implementation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../report_tenant_isolation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Report Isolation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Naming & Singletons
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Naming & Singletons
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-executive-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Executive Summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-naming-series-per-tenant-deep-dive" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Naming Series per Tenant: Deep Dive
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Naming Series per Tenant: Deep Dive">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21-the-root-problem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1 The Root Problem
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2.1 The Root Problem">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-3-failure-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The 3 Failure Modes:
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22-solution-architecture-composite-tenant-company-namespace" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.2 Solution Architecture: Composite Tenant-Company Namespace
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2.2 Solution Architecture: Composite Tenant-Company Namespace">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#key-architecture-non-functional-requirements-nfrs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key Architecture &amp; Non-Functional Requirements (NFRs):
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-the-etc-problem-shared-singletons-in-frappe" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. The "Etc." Problem: Shared Singletons in Frappe
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. The &#34;Etc.&#34; Problem: Shared Singletons in Frappe">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31-single-doctypes-tabsingles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 Single DocTypes (tabSingles)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3.1 Single DocTypes (tabSingles)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-problem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Problem:
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-solutions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Solutions:
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#implementation-of-approach-2-tenant-aware-tabsingles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Implementation of Approach 2 (Tenant-Aware tabSingles):
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32-fiscal-years-tabfiscal-year" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 Fiscal Years (tabFiscal Year)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#33-branding-letter-heads-print-formats" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.3 Branding, Letter Heads &amp; Print Formats
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#34-outgoing-email-accounts-background-jobs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.4 Outgoing Email Accounts &amp; Background Jobs
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-architectural-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Architectural Summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Microservice Integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-executive-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Executive Summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-naming-series-per-tenant-deep-dive" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Naming Series per Tenant: Deep Dive
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Naming Series per Tenant: Deep Dive">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21-the-root-problem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1 The Root Problem
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2.1 The Root Problem">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-3-failure-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The 3 Failure Modes:
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22-solution-architecture-composite-tenant-company-namespace" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.2 Solution Architecture: Composite Tenant-Company Namespace
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2.2 Solution Architecture: Composite Tenant-Company Namespace">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#key-architecture-non-functional-requirements-nfrs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key Architecture &amp; Non-Functional Requirements (NFRs):
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-the-etc-problem-shared-singletons-in-frappe" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. The "Etc." Problem: Shared Singletons in Frappe
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. The &#34;Etc.&#34; Problem: Shared Singletons in Frappe">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31-single-doctypes-tabsingles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 Single DocTypes (tabSingles)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3.1 Single DocTypes (tabSingles)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-problem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Problem:
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-solutions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Solutions:
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#implementation-of-approach-2-tenant-aware-tabsingles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Implementation of Approach 2 (Tenant-Aware tabSingles):
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32-fiscal-years-tabfiscal-year" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 Fiscal Years (tabFiscal Year)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#33-branding-letter-heads-print-formats" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.3 Branding, Letter Heads &amp; Print Formats
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#34-outgoing-email-accounts-background-jobs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.4 Outgoing Email Accounts &amp; Background Jobs
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-architectural-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Architectural Summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="multi-tenant-naming-series-shared-singletons-architecture">Multi-Tenant Naming Series &amp; Shared Singletons Architecture</h1>
+<blockquote>
+<p><strong>Context:</strong> Architectural specification for solving tenant-isolated Naming Series, Sequence Counters, and Global Singletons in <code>saas_platform</code>.</p>
+</blockquote>
+<hr />
+<h2 id="1-executive-summary">1. Executive Summary</h2>
+<p>In a shared-database, shared-schema multi-tenant Frappe architecture, row-level filtering (<code>tenant_id</code>) resolves data visibility, but <strong>global state and shared singletons</strong> introduce severe architectural failures:</p>
+<ol>
+<li><strong>Naming Series &amp; Counter Collisions (<code>tabSeries</code>):</strong></li>
+<li>Counter sequences in <code>tabSeries</code> are shared globally across all tenants.</li>
+<li>Number sequence gaps occur when multiple tenants share a prefix (violating tax and audit compliance like GST, VAT, and IFRS).</li>
+<li>Document <code>name</code> is the SQL <code>PRIMARY KEY</code> on all DocType tables; two tenants cannot create a document with the same name.</li>
+<li><strong>Single DocTypes (<code>tabSingles</code>):</strong></li>
+<li>Settings DocTypes (<code>Global Defaults</code>, <code>Accounts Settings</code>, <code>Stock Settings</code>, <code>Selling Settings</code>, etc.) store key-value pairs in a single global table <code>tabSingles</code>.</li>
+<li>Changes made by Tenant A overwrite the settings for Tenant B.</li>
+<li><strong>Document Naming Settings &amp; Rules:</strong></li>
+<li>Prefix customization in the Frappe Desk modifies global DocField options or global <code>Document Naming Rule</code> records.</li>
+<li><strong>Fiscal Years, Branding, and Workspaces:</strong></li>
+<li>Multiple tenants operate in different tax jurisdictions with varying fiscal cycles, distinct letterheads, and customized workspaces.</li>
+</ol>
+<hr />
+<h2 id="2-naming-series-per-tenant-deep-dive">2. Naming Series per Tenant: Deep Dive</h2>
+<h3 id="21-the-root-problem">2.1 The Root Problem</h3>
+<p>Frappe's naming engine (<a href="file:///Users/varkrish/personal/1frappe_ecosystem/frappe/frappe/model/naming.py">frappe/model/naming.py</a>) generates document names via <a href="file:///Users/varkrish/personal/1frappe_ecosystem/frappe/frappe/model/naming.py#L289-L313">make_autoname</a> calling <a href="file:///Users/varkrish/personal/1frappe_ecosystem/frappe/frappe/model/naming.py#L428-L444">getseries</a>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">getseries</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">digits</span><span class="p">):</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">series</span> <span class="o">=</span> <span class="n">DocType</span><span class="p">(</span><span class="s2">"Series"</span><span class="p">)</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">current</span> <span class="o">=</span> <span class="p">(</span><span class="n">frappe</span><span class="o">.</span><span class="n">qb</span><span class="o">.</span><span class="n">from_</span><span class="p">(</span><span class="n">series</span><span class="p">)</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">series</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="n">key</span><span class="p">)</span><span class="o">.</span><span class="n">for_update</span><span class="p">()</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="s2">"current"</span><span class="p">))</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="k">if</span> <span class="n">current</span> <span class="ow">and</span> <span class="n">current</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>        <span class="n">frappe</span><span class="o">.</span><span class="n">db</span><span class="o">.</span><span class="n">sql</span><span class="p">(</span><span class="s2">"UPDATE `tabSeries` SET `current` = `current` + 1 WHERE `name`=</span><span class="si">%s</span><span class="s2">"</span><span class="p">,</span> <span class="p">(</span><span class="n">key</span><span class="p">,))</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>        <span class="n">current</span> <span class="o">=</span> <span class="n">cint</span><span class="p">(</span><span class="n">current</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="k">else</span><span class="p">:</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>        <span class="n">frappe</span><span class="o">.</span><span class="n">db</span><span class="o">.</span><span class="n">sql</span><span class="p">(</span><span class="s2">"INSERT INTO `tabSeries` (`name`, `current`) VALUES (</span><span class="si">%s</span><span class="s2">, 1)"</span><span class="p">,</span> <span class="p">(</span><span class="n">key</span><span class="p">,))</span>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>        <span class="n">current</span> <span class="o">=</span> <span class="mi">1</span>
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>    <span class="k">return</span> <span class="p">(</span><span class="s2">"%0"</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">digits</span><span class="p">)</span> <span class="o">+</span> <span class="s2">"d"</span><span class="p">)</span> <span class="o">%</span> <span class="n">current</span>
+</code></pre></div>
+<p>Default ERPNext series are hardcoded without company or tenant prefixes:
+- <code>Sales Invoice</code>: <code>ACC-SINV-.YYYY.-</code>
+- <code>Purchase Invoice</code>: <code>ACC-PINV-.YYYY.-</code>
+- <code>Sales Order</code>: <code>SO-.YYYY.-</code>
+- <code>Purchase Order</code>: <code>PO-.YYYY.-</code>
+- <code>Journal Entry</code>: <code>ACC-JV-.YYYY.-</code></p>
+<h4 id="the-3-failure-modes">The 3 Failure Modes:</h4>
+<ol>
+<li><strong>Primary Key Collision:</strong>
+   If Tenant A and Tenant B both configure <code>INV-.YYYY.-.#####</code> and start from 1, Tenant B's first invoice crashes with:
+   <code>Duplicate entry 'INV-2026-00001' for key 'PRIMARY'</code> because <code>name</code> is the table's unique primary key.</li>
+<li><strong>Audit &amp; Tax Non-Compliance (The Number Gap Leak):</strong>
+   If both tenants share the default prefix <code>ACC-SINV-.2026.-</code>:</li>
+<li>Tenant A issues: <code>ACC-SINV-2026-00001</code></li>
+<li>Tenant B issues: <code>ACC-SINV-2026-00002</code></li>
+<li>Tenant A issues: <code>ACC-SINV-2026-00003</code>
+   Tenant A now has an unexplained gap (<code>00002</code> missing). In many jurisdictions (e.g. EU VAT, Indian GST, UK HMRC, Australian ATO), sequential invoice numbering with missing numbers triggers tax audits and fines for suspected off-the-books sales.</li>
+<li><strong>Business Volume Information Leak:</strong>
+   Tenant A can monitor gaps in their sequential numbering to determine the total transaction volume of all other tenants on the SaaS cluster.</li>
+</ol>
+<hr />
+<h3 id="22-solution-architecture-composite-tenant-company-namespace">2.2 Solution Architecture: Composite Tenant-Company Namespace</h3>
+<p>In a shared-database multi-tenant cluster, <strong>Company abbreviations (<code>Company.abbr</code>) can legitimately be identical across different tenants</strong> (e.g. Tenant 1 "Acme Corp" <code>ACM</code> and Tenant 2 "Acme Motors" <code>ACM</code>). If naming series only used <code>Company.abbr</code>, both tenants would collide on <code>tabSeries</code> counters and crash on SQL <code>PRIMARY KEY</code> (<code>tabDocType.name</code>).</p>
+<p>To solve this, <code>saas_platform</code> implements a <strong>Composite Tenant-Company Namespace</strong>:
+<code>{tenant_code}-{company_abbr}</code> (e.g. <code>TENANT1-ACM-</code>, <code>TENANT2-ACM-</code>).</p>
+<pre class="mermaid"><code>flowchart TD
+    A[New Document Save: doc.insert] --&gt; B[Hook: before_naming]
+    B --&gt; C{Is Session User Tenant User?}
+    C -- No / System --&gt; D[Use Standard Global Series]
+    C -- Yes --&gt; E[Resolve Composite Prefix: {tenant_code}-{company_abbr}]
+    E --&gt; F[Inject Composite Prefix into doc.naming_series]
+    F --&gt; G[make_autoname with Composite Key: TENANT1-ACM-ACC-SINV-.2026.-]
+    G --&gt; H[tabSeries Counter updated for TENANT1-ACM-... independently]
+    H --&gt; I[Document Name Generated: TENANT1-ACM-ACC-SINV-2026-00001]
+    I --&gt; J[before_save Hook: Strip tenant_code for display_number]
+    J --&gt; K[display_number = ACM-ACC-SINV-2026-00001]</code></pre>
+<h4 id="key-architecture-non-functional-requirements-nfrs">Key Architecture &amp; Non-Functional Requirements (NFRs):</h4>
+<ol>
+<li><strong>Duplicate Company Abbreviation Collision Freedom:</strong></li>
+<li>Tenant 1 (<code>tenant_1</code>, <code>ACM</code>) receives series <code>TENANT1-ACM-ACC-SINV-.YYYY.-</code> $\rightarrow$ DB PK <code>TENANT1-ACM-ACC-SINV-2026-00001</code>.</li>
+<li>Tenant 2 (<code>tenant_2</code>, <code>ACM</code>) receives series <code>TENANT2-ACM-ACC-SINV-.YYYY.-</code> $\rightarrow$ DB PK <code>TENANT2-ACM-ACC-SINV-2026-00001</code>.</li>
+<li><code>tabSeries</code> counters are partitioned independently (<code>TENANT1-ACM-...</code> vs <code>TENANT2-ACM-...</code>).</li>
+<li><strong>Sub-Millisecond In-Memory LRU Caching (<code>@lru_cache(maxsize=1024)</code>):</strong></li>
+<li>Abbreviation lookup (<code>get_company_abbr</code>) is memoized in memory. Benchmark tests verify 10,000 lookups complete in $&lt;15\text{ms}$ ($&lt;0.0015\text{ms}$ per call), eliminating database roundtrips during high-throughput document inserts.</li>
+<li><strong>Database Concurrency &amp; Row-Lock Partitioning:</strong></li>
+<li>In Frappe's <code>getseries()</code>, each series counter in <code>tabSeries</code> is locked using <code>SELECT ... FOR UPDATE</code>.</li>
+<li>Because each tenant's series key is prefixed with <code>{tenant_code}-</code>, row-level locks are strictly partitioned. High-volume invoicing in Tenant 1 never blocks or queues Tenant 2.</li>
+<li><strong>Column Length Safety:</strong></li>
+<li><code>tabSeries.name</code> is limited to <code>VARCHAR(100)</code>, and <code>tabDocType.name</code> is limited to <code>VARCHAR(140)</code>.</li>
+<li><code>tenant_code</code> is sanitized to a max of 10 alphanumeric characters, and <code>company_abbr</code> is capped at 8 characters. The composite prefix <code>{tenant_code}-{abbr}-</code> uses $&lt;20$ characters, safely preserving ample headroom.</li>
+<li><strong>Customer-Facing Invoice Cleanliness:</strong></li>
+<li>The internal database <code>name</code> is <code>TENANT1-ACM-ACC-SINV-2026-00001</code>.</li>
+<li><code>set_display_number</code> runs on <code>before_save</code> (before the initial <code>INSERT</code>), stripping only the <code>{tenant_code}-</code> prefix so <code>display_number</code> is populated as <code>ACM-ACC-SINV-2026-00001</code> with zero additional SQL <code>UPDATE</code> overhead.</li>
+<li>Jinja filter <code>get_clean_display_name</code> strips the tenant code in print formats and PDF exports.</li>
+<li><strong>Smart Prefixing &amp; Idempotency:</strong></li>
+<li>If a tenant user pre-configures <code>ACM-ACC-SINV-.YYYY.-</code> in Naming Series settings, the hook prepends only <code>{tenant_code}-</code> to prevent duplicated abbreviations (<code>TENANT1-ACM-ACM-...</code>).</li>
+<li>If a document is re-saved, the idempotency check detects existing prefixes and avoids re-prefixing.</li>
+<li><strong>Production Code Safety:</strong></li>
+<li>No mock shims or fallback mock classes exist in production codebase files. All testing harnesses and mocks reside exclusively in test suites.</li>
+</ol>
+<hr />
+<h2 id="3-the-etc-problem-shared-singletons-in-frappe">3. The "Etc." Problem: Shared Singletons in Frappe</h2>
+<p>Beyond naming series, Frappe was built on single-tenant assumptions where numerous system components exist as singletons.</p>
+<h3 id="31-single-doctypes-tabsingles">3.1 Single DocTypes (<code>tabSingles</code>)</h3>
+<h4 id="the-problem">The Problem:</h4>
+<p>Single DocTypes (<code>Accounts Settings</code>, <code>Stock Settings</code>, <code>Buying Settings</code>, <code>Selling Settings</code>, <code>Global Defaults</code>, <code>System Settings</code>) are stored in <code>tabSingles</code>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="o">`</span><span class="n">tabSingles</span><span class="o">`</span><span class="w"> </span><span class="p">(</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">    </span><span class="o">`</span><span class="n">doctype</span><span class="o">`</span><span class="w"> </span><span class="nb">varchar</span><span class="p">(</span><span class="mi">140</span><span class="p">)</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">    </span><span class="o">`</span><span class="n">field</span><span class="o">`</span><span class="w"> </span><span class="nb">varchar</span><span class="p">(</span><span class="mi">140</span><span class="p">)</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">    </span><span class="o">`</span><span class="n">value</span><span class="o">`</span><span class="w"> </span><span class="nb">text</span><span class="p">,</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">    </span><span class="k">PRIMARY</span><span class="w"> </span><span class="k">KEY</span><span class="w"> </span><span class="p">(</span><span class="o">`</span><span class="n">doctype</span><span class="o">`</span><span class="p">,</span><span class="o">`</span><span class="n">field</span><span class="o">`</span><span class="p">)</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="p">);</span>
+</code></pre></div>
+There is <strong>only one row per setting</strong> for the entire database. If Tenant A modifies <code>default_currency</code> or <code>credit_limit_check</code>, it mutates configuration globally for all tenants.</p>
+<h4 id="the-solutions">The Solutions:</h4>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Approach</th>
+<th style="text-align: left;">Implementation</th>
+<th style="text-align: left;">Pros</th>
+<th style="text-align: left;">Cons</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Approach 1: Company-Level Settings (Recommended for ERPNext)</strong></td>
+<td style="text-align: left;">In ERPNext, migrate tenant-specific operational settings to <code>Company</code> DocType custom fields (e.g. <code>Company.default_currency</code>, <code>Company.stock_valuation_method</code>).</td>
+<td style="text-align: left;">100% native; no core table schema hacks; fully supported by ERPNext multi-company features.</td>
+<td style="text-align: left;">Limited to settings that can be logically attached to a Company.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Approach 2: Multi-Tenant <code>tabSingles</code> Partitioning</strong></td>
+<td style="text-align: left;">Alter <code>tabSingles</code> to add <code>tenant_id</code>: <code>PRIMARY KEY (doctype, field, tenant_id)</code> and monkey-patch <code>frappe.db.get_single_value</code> and <code>frappe.db.set_single_value</code>.</td>
+<td style="text-align: left;">Full isolation across all Single DocTypes transparently.</td>
+<td style="text-align: left;">Requires monkey-patching core database accessors; must handle cache keys per tenant in Redis.</td>
+</tr>
+</tbody>
+</table>
+<h4 id="implementation-of-approach-2-tenant-aware-tabsingles">Implementation of Approach 2 (Tenant-Aware <code>tabSingles</code>):</h4>
+<ol>
+<li>
+<p><strong>Alter <code>tabSingles</code> Schema Patch:</strong>
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">frappe</span><span class="o">.</span><span class="n">db</span><span class="o">.</span><span class="n">sql</span><span class="p">(</span><span class="s2">"""</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="s2">    ALTER TABLE `tabSingles`</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="s2">    DROP PRIMARY KEY,</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="s2">    ADD COLUMN `tenant_id` VARCHAR(140) DEFAULT 'SYSTEM',</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="s2">    ADD PRIMARY KEY (`doctype`, `field`, `tenant_id`);</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="s2">"""</span><span class="p">)</span>
+</code></pre></div></p>
+</li>
+<li>
+<p><strong>Patch Single Accessors (<code>saas_platform/utils/singles.py</code>):</strong>
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">frappe</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">frappe.database.database</span><span class="w"> </span><span class="kn">import</span> <span class="n">Database</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="n">_orig_get_single_value</span> <span class="o">=</span> <span class="n">Database</span><span class="o">.</span><span class="n">get_single_value</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="k">def</span><span class="w"> </span><span class="nf">tenant_aware_get_single_value</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">doctype</span><span class="p">,</span> <span class="n">fieldname</span><span class="p">,</span> <span class="n">cache</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>    <span class="n">tenant_id</span> <span class="o">=</span> <span class="n">frappe</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"tenant_id"</span><span class="p">)</span>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>    <span class="k">if</span> <span class="ow">not</span> <span class="n">tenant_id</span> <span class="ow">or</span> <span class="n">tenant_id</span> <span class="o">==</span> <span class="s2">"SYSTEM"</span> <span class="ow">or</span> <span class="n">frappe</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">user</span> <span class="o">==</span> <span class="s2">"Administrator"</span><span class="p">:</span>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>        <span class="k">return</span> <span class="n">_orig_get_single_value</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">doctype</span><span class="p">,</span> <span class="n">fieldname</span><span class="p">,</span> <span class="n">cache</span><span class="o">=</span><span class="n">cache</span><span class="p">)</span>
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>    <span class="c1"># Check tenant-specific value first</span>
+<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>    <span class="n">val</span> <span class="o">=</span> <span class="n">frappe</span><span class="o">.</span><span class="n">db</span><span class="o">.</span><span class="n">sql</span><span class="p">(</span><span class="s2">"""</span>
+<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a><span class="s2">        SELECT `value` FROM `tabSingles`</span>
+<a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a><span class="s2">        WHERE `doctype`=</span><span class="si">%s</span><span class="s2"> AND `field`=</span><span class="si">%s</span><span class="s2"> AND `tenant_id`=</span><span class="si">%s</span>
+<a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a><span class="s2">    """</span><span class="p">,</span> <span class="p">(</span><span class="n">doctype</span><span class="p">,</span> <span class="n">fieldname</span><span class="p">,</span> <span class="n">tenant_id</span><span class="p">))</span>
+<a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a>
+<a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a>    <span class="k">if</span> <span class="n">val</span> <span class="ow">and</span> <span class="n">val</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a>        <span class="k">return</span> <span class="n">val</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+<a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a>
+<a id="__codelineno-3-20" name="__codelineno-3-20" href="#__codelineno-3-20"></a>    <span class="c1"># Fallback to system default</span>
+<a id="__codelineno-3-21" name="__codelineno-3-21" href="#__codelineno-3-21"></a>    <span class="k">return</span> <span class="n">_orig_get_single_value</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">doctype</span><span class="p">,</span> <span class="n">fieldname</span><span class="p">,</span> <span class="n">cache</span><span class="o">=</span><span class="n">cache</span><span class="p">)</span>
+<a id="__codelineno-3-22" name="__codelineno-3-22" href="#__codelineno-3-22"></a>
+<a id="__codelineno-3-23" name="__codelineno-3-23" href="#__codelineno-3-23"></a><span class="n">Database</span><span class="o">.</span><span class="n">get_single_value</span> <span class="o">=</span> <span class="n">tenant_aware_get_single_value</span>
+</code></pre></div></p>
+</li>
+</ol>
+<hr />
+<h3 id="32-fiscal-years-tabfiscal-year">3.2 Fiscal Years (<code>tabFiscal Year</code>)</h3>
+<p>Different tenants operate in different tax jurisdictions:
+- <strong>United States:</strong> Jan 1 – Dec 31
+- <strong>India / UK:</strong> Apr 1 – Mar 31
+- <strong>Australia:</strong> Jul 1 – Jun 30</p>
+<p><strong>Action:</strong>
+1. Ensure <code>Fiscal Year</code> has a <code>tenant_id</code> column.
+2. In <a href="file:///Users/varkrish/personal/1frappe_ecosystem/saas_platform/saas_platform/saas_platform/doctype/tenant/tenant.py#L49-L68">Tenant.after_insert</a>, automatically provision the correct <code>Fiscal Year</code> linked to the tenant's <code>Company</code> based on their country.
+3. Remove <code>Fiscal Year</code> from any exempt system doctype lists so <code>permission_query_conditions</code> filters it by tenant.</p>
+<hr />
+<h3 id="33-branding-letter-heads-print-formats">3.3 Branding, Letter Heads &amp; Print Formats</h3>
+<ul>
+<li><strong>Letter Head (<code>tabLetter Head</code>):</strong> Must be tagged with <code>tenant_id</code>. Tenant A must never view or select Tenant B's corporate letterhead, logo, or tax registration header.</li>
+<li><strong>Print Format (<code>tabPrint Format</code>):</strong> Custom print formats designed by Tenant A must have <code>tenant_id</code> set and isolated.</li>
+<li><strong>Address &amp; Contact:</strong> Already tagged with <code>tenant_id</code> via <a href="file:///Users/varkrish/personal/1frappe_ecosystem/saas_platform/saas_platform/patches/add_tenant_id_to_all_tables.py">add_tenant_id_to_all_tables.py</a> and linked to the tenant's Company or Customer.</li>
+</ul>
+<hr />
+<h3 id="34-outgoing-email-accounts-background-jobs">3.4 Outgoing Email Accounts &amp; Background Jobs</h3>
+<ul>
+<li>Standard Frappe uses a single default outgoing <code>Email Account</code>.</li>
+<li>Each tenant should either:</li>
+<li>Configure their own <code>Email Account</code> (SMTP / SendGrid / Amazon SES credentials) tagged with their <code>tenant_id</code>.</li>
+<li>Or use the platform's multi-tenant email router where the <code>from_email</code> and reply headers are dynamically set to the tenant's verified domain.</li>
+</ul>
+<hr />
+<h2 id="4-architectural-summary">4. Architectural Summary</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Dimension</th>
+<th style="text-align: left;">Challenge</th>
+<th style="text-align: left;">SaaS Platform Solution</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Naming Series Counters</strong></td>
+<td style="text-align: left;">Shared <code>tabSeries</code> counter leaks volume &amp; causes gaps.</td>
+<td style="text-align: left;">Auto-namespace series prefix with Company Abbreviation (<code>ACM-ACC-SINV-.YYYY.-</code>).</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Primary Key Collisions</strong></td>
+<td style="text-align: left;">SQL <code>name</code> primary key collisions between tenants.</td>
+<td style="text-align: left;">Globally unique prefixed names; optional clean <code>display_number</code> for customer PDFs.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Single DocTypes (<code>tabSingles</code>)</strong></td>
+<td style="text-align: left;">One global setting record per field across all tenants.</td>
+<td style="text-align: left;">Company-level field overrides + Tenant-partitioned <code>tabSingles</code> (<code>tenant_id</code> composite key).</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Fiscal Periods</strong></td>
+<td style="text-align: left;">Conflicting regional fiscal years.</td>
+<td style="text-align: left;">Tenant-isolated <code>Fiscal Year</code> records linked to tenant Company.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Reports</strong></td>
+<td style="text-align: left;">Raw SQL bypasses ORM permissions.</td>
+<td style="text-align: left;">AST-based SQL query rewriter (<a href="file:///Users/varkrish/personal/1frappe_ecosystem/saas_platform/docs/report_tenant_isolation.md">report_tenant_isolation.md</a>).</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Brand Assets</strong></td>
+<td style="text-align: left;">Letterheads, templates, print formats shared.</td>
+<td style="text-align: left;">Row-level tenant isolation applied to <code>Letter Head</code> and <code>Print Format</code>.</td>
+</tr>
+</tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "content.code.copy", "search.highlight"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>
