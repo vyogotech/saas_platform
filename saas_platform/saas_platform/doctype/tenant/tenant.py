@@ -73,6 +73,77 @@ class Tenant(Document):
         # Save changes
         self.save()
 
+    def _get_customer_group(self):
+        """Resolve existing Customer Group or create a default one if missing."""
+        if frappe.db.exists("Customer Group", "Commercial"):
+            return "Commercial"
+        default_cg = frappe.db.get_single_value("Selling Settings", "customer_group")
+        if default_cg and frappe.db.exists("Customer Group", default_cg):
+            return default_cg
+        cg = frappe.db.get_value("Customer Group", {"is_group": 0}, "name")
+        if cg:
+            return cg
+        cg = frappe.db.get_value("Customer Group", {}, "name")
+        if cg:
+            return cg
+        cg_doc = frappe.get_doc({
+            "doctype": "Customer Group",
+            "customer_group_name": "Commercial",
+            "is_group": 0,
+        })
+        cg_doc.insert(ignore_permissions=True)
+        return cg_doc.name
+
+    def _get_territory(self):
+        """Resolve existing Territory or create a default one if missing."""
+        if frappe.db.exists("Territory", "All Territories"):
+            return "All Territories"
+        default_terr = frappe.db.get_single_value("Selling Settings", "territory")
+        if default_terr and frappe.db.exists("Territory", default_terr):
+            return default_terr
+        terr = frappe.db.get_value("Territory", {"is_group": 0}, "name")
+        if terr:
+            return terr
+        terr = frappe.db.get_value("Territory", {}, "name")
+        if terr:
+            return terr
+        terr_doc = frappe.get_doc({
+            "doctype": "Territory",
+            "territory_name": "All Territories",
+            "is_group": 0,
+        })
+        terr_doc.insert(ignore_permissions=True)
+        return terr_doc.name
+
+    def _get_item_group(self):
+        """Resolve existing Item Group or create a default one if missing."""
+        if frappe.db.exists("Item Group", "Services"):
+            return "Services"
+        ig = frappe.db.get_value("Item Group", {"is_group": 0}, "name") or frappe.db.get_value("Item Group", {}, "name")
+        if ig:
+            return ig
+        ig_doc = frappe.get_doc({
+            "doctype": "Item Group",
+            "item_group_name": "Services",
+            "is_group": 0,
+        })
+        ig_doc.insert(ignore_permissions=True)
+        return ig_doc.name
+
+    def _get_stock_uom(self):
+        """Resolve existing UOM or create a default one if missing."""
+        if frappe.db.exists("UOM", "Nos"):
+            return "Nos"
+        uom = frappe.db.get_value("UOM", {}, "name")
+        if uom:
+            return uom
+        uom_doc = frappe.get_doc({
+            "doctype": "UOM",
+            "uom_name": "Nos",
+        })
+        uom_doc.insert(ignore_permissions=True)
+        return uom_doc.name
+
     def create_customer(self):
         """Create ERPNext Customer for billing (tenant_id = PLATFORM via acting_tenant)"""
         try:
@@ -89,8 +160,8 @@ class Tenant(Document):
                 "doctype": "Customer",
                 "customer_name": customer_name,
                 "customer_type": "Company",
-                "customer_group": "Commercial",
-                "territory": "All Territories",
+                "customer_group": self._get_customer_group(),
+                "territory": self._get_territory(),
                 "default_currency": self.get_default_currency(),
             })
             customer.insert(ignore_permissions=True)
@@ -242,8 +313,8 @@ class Tenant(Document):
                     "doctype": "Item",
                     "item_code": "Free Plan Service",
                     "item_name": "Free Plan Service",
-                    "item_group": "Services",
-                    "stock_uom": "Nos",
+                    "item_group": self._get_item_group(),
+                    "stock_uom": self._get_stock_uom(),
                     "is_stock_item": 0,
                     "is_sales_item": 1
                 })
