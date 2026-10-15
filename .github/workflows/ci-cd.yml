@@ -1,4 +1,4 @@
-name: CI/CD Pipeline (Frappe v15)
+name: CI
 
 on:
   push:
@@ -8,71 +8,27 @@ on:
 
 jobs:
   lint-and-test:
+    name: Lint & Test
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [3.10]
+        python-version: ['3.10', '3.11']
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      # Backend: Setup Python, install dependencies, lint, and tests
       - name: Use Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+
       - name: Install Python Dependencies
         run: |
           pip install -r requirements.txt
           pip install flake8
+
       - name: Lint Backend
         run: flake8 saas_platform
+
       - name: Run Backend Tests
         run: python -m unittest discover saas_platform/utils
-
-  build-and-deploy:
-    needs: lint-and-test
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      # Setup Bench & Frappe v15
-      - name: Setup Bench & Frappe v15
-        run: |
-          pip install frappe-bench
-          bench init frappe-bench --frappe-branch version-15 --skip-redis-config-generation
-          cd frappe-bench
-          bench get-app https://github.com/your-repo/saas_platform.git
-      - name: Create CI Site & Install App
-        run: |
-          cd frappe-bench
-          bench new-site ci-temp \
-            --no-mariadb-socket \
-            --admin-password admin \
-            --mariadb-root-password root \
-            --install-app erpnext@15 \
-            --install-app saas_platform
-
-      # Migrate & Build
-      - name: Migrate & Build
-        run: |
-          cd frappe-bench
-          bench --site ci-temp migrate
-          bench build
-
-      # Deploy to Production
-      - name: Deploy to Production
-        uses: appleboy/ssh-action@v0.1.5
-        with:
-          host: ${{ secrets.PROD_HOST }}
-          username: ${{ secrets.PROD_USER }}
-          key: ${{ secrets.PROD_SSH_KEY }}
-          script: |
-            cd ~/frappe-bench
-            git pull origin main
-            bench --site site-template.localhost migrate
-            bench build
-            sudo systemctl restart frappe-bench-gunicorn
-            sudo systemctl reload nginx
