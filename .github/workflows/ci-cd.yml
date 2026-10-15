@@ -133,7 +133,7 @@ jobs:
           docker exec -w /home/frappe/frappe-bench sne bench --site dev.localhost list-apps | grep -w "$APP"
           docker exec -w /home/frappe/frappe-bench sne bench --site dev.localhost set-config allow_tests true
           docker exec -w /home/frappe/frappe-bench sne bench --site dev.localhost run-tests --app "$APP"
-          docker exec -w /home/frappe/frappe-bench sne bench --site dev.localhost execute saas_platform.utils.test_tenant.test_create_tenant
+          docker exec -w /home/frappe/frappe-bench sne bench --site dev.localhost execute saas_platform.utils.tenant.verify_tenant
 
       - name: Bench logs on failure
         if: failure()
@@ -294,30 +294,10 @@ jobs:
 
       - name: Verify app is installed and operational
         run: |
-          docker exec -u 0 sne mkdir -p /home/frappe/logs /home/frappe/frappe-bench/logs
-          docker exec -u 0 sne chown -R 1001:1001 /home/frappe/logs /home/frappe/frappe-bench/logs
           docker exec -w /home/frappe/frappe-bench sne bench --site dev.localhost list-apps | grep -w "$APP"
           docker exec -w /home/frappe/frappe-bench sne bench --site dev.localhost execute frappe.db.exists --args "['DocType', 'Tenant']"
           docker exec -w /home/frappe/frappe-bench sne bench --site dev.localhost execute frappe.db.exists --args "['DocType', 'Plan']"
-          docker exec -i -w /home/frappe/frappe-bench sne ./env/bin/python - <<'PY'
-          import frappe
-          frappe.init('dev.localhost', sites_path='/home/frappe/frappe-bench/sites')
-          frappe.connect()
-          tenant = frappe.get_doc({
-              'doctype': 'Tenant',
-              'tenant_name': 'Production Verification Tenant',
-              'subdomain': 'prodverify',
-              'admin_email': 'verify@test.com',
-              'status': 'Active'
-          })
-          tenant.insert(ignore_permissions=True)
-          frappe.db.commit()
-          print('Successfully verified tenant creation in SNE:', tenant.name, tenant.tenant_id)
-          assert frappe.db.exists('Tenant', tenant.name)
-          assert frappe.db.exists('Company', {'tenant_id': tenant.tenant_id})
-          assert frappe.db.exists('User', {'email': 'verify@test.com'})
-          frappe.destroy()
-          PY
+          docker exec -w /home/frappe/frappe-bench sne bench --site dev.localhost execute saas_platform.utils.tenant.verify_tenant
 
       - name: Bench logs on failure
         if: failure()

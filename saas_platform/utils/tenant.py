@@ -302,3 +302,27 @@ def setup_user_tenant(app=None):
                         "SYSTEM", update_modified=False)
     frappe.db.commit()
     frappe.log("Set Administrator tenant_id = SYSTEM")
+
+
+def verify_tenant():
+    """Verify tenant provisioning end-to-end (used in CI verification)."""
+    import time
+    unique_suffix = str(int(time.time()))[-4:]
+    tenant_name = f"Verify Tenant {unique_suffix}"
+    subdomain = f"verify{unique_suffix}"
+    admin_email = f"verify{unique_suffix}@test.com"
+
+    tenant = frappe.get_doc({
+        "doctype": "Tenant",
+        "tenant_name": tenant_name,
+        "subdomain": subdomain,
+        "admin_email": admin_email,
+        "status": "Active"
+    })
+    tenant.insert(ignore_permissions=True)
+    frappe.db.commit()
+    print(f"Successfully verified tenant creation in SNE: {tenant.name} ({tenant.tenant_id})")
+    assert frappe.db.exists("Tenant", tenant.name)
+    assert frappe.db.exists("Company", {"tenant_id": tenant.tenant_id})
+    assert frappe.db.exists("User", {"email": admin_email})
+    return tenant.name

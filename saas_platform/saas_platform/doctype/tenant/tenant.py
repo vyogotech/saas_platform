@@ -176,9 +176,23 @@ class Tenant(Document):
                 f"Failed to create customer for tenant {self.tenant_id}: {str(e)}")
             frappe.throw(f"Failed to create customer: {str(e)}")
 
+    def _ensure_transit_warehouse_type(self):
+        """Ensure Warehouse Type 'Transit' exists before ERPNext creates default warehouses."""
+        if frappe.db.table_exists("Warehouse Type") and not frappe.db.exists("Warehouse Type", "Transit"):
+            try:
+                frappe.get_doc({
+                    "doctype": "Warehouse Type",
+                    "name": "Transit",
+                    "description": "Goods In Transit"
+                }).insert(ignore_permissions=True)
+                frappe.db.commit()
+            except Exception:
+                pass
+
     def create_company(self):
         """Create ERPNext Company for tenant's own use"""
         try:
+            self._ensure_transit_warehouse_type()
             company_name = self.tenant_name
 
             # Check if company with this name already exists
