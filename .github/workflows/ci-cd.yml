@@ -1,34 +1,378 @@
 name: CI
 
+# lint → (test | package → verify) → publish
+#
+# Everything that needs a bench runs on the SNE image the Vyogo pools run:
+# one container with MariaDB, Redis, workers, and a ready site.
+#
+#   test     mounts this checkout into the SNE bench, installs the app on the ready site,
+#            and runs the test suite
+#   package  builds the FPM package with vendored Python dependencies for amd64 and arm64
+#   verify   installs that package into a fresh SNE bench with `fpm install`, exactly as a pool
+#            would, and verifies the app is listed and operational
+#   publish  publishes the verified package as an OCI artifact to GHCR (and HTTP registry if configured)
+#
+# Triggers:
+#   any branch     lint, test, package, verify
+#   push to main   + publish snapshot vyogotech/saas_platform==X.Y.Z-git.<date>.<sha>
+#   tag v<X.Y.Z>   + publish release  vyogotech/saas_platform==X.Y.Z
+#   dispatch       as the ref, with publish and version overridable
+
 on:
   push:
-    branches: [ main ]
+    branches: ['**']
+    tags: ['v*']
   pull_request:
-    branches: [ main ]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish to the registry even from a branch.
+        type: boolean
+        default: false
+      version:
+        description: Version to package. Default is derived from the ref.
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref_type != 'tag' && github.ref_name != 'main' }}
+
+env:
+  FPM_VERSION: v4.7.0
+  SNE_IMAGE: docker.io/vyogo/erpnext:sne-version-16
+  FRAPPE_REF: version-16
+  BENCH_PYTHON: '3.14'
+  FPM_HTTP_REGISTRY: ${{ vars.FPM_REGISTRY_URL || 'https://fpm.vyogo.tech' }}
+  FPM_OCI_REPOSITORY: ${{ vars.FPM_OCI_REPOSITORY || 'ghcr.io/vyogotech/fpm' }}
+  ORG: vyogotech
+  APP: saas_platform
 
 jobs:
-  lint-and-test:
-    name: Lint & Test
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ['3.10', '3.11']
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+  # ──────────────────────────────────────────────────────────────────────
+  # Tier 1 — static checks & fast unittests against the working tree (no bench).
+  # ──────────────────────────────────────────────────────────────────────
+  lint:
+    name: Lint & unit tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
 
-      - name: Use Python ${{ matrix.python-version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: '3.11'
 
-      - name: Install Python Dependencies
+      - name: Install dependencies
         run: |
+          python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install flake8
 
-      - name: Lint Backend
+      - name: Flake8 lint
         run: flake8 saas_platform
 
-      - name: Run Backend Tests
+      - name: Run unit tests
         run: python -m unittest discover saas_platform/utils
+
+  # ──────────────────────────────────────────────────────────────────────
+  # Tier 2a — test suite on the SNE bench. The checkout is mounted into the
+  # SNE container, installed onto dev.localhost, and tests are executed.
+  # ──────────────────────────────────────────────────────────────────────
+  test:
+    name: Test on the SNE bench
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    needs: lint
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start the SNE bench with this checkout as the app
+        run: |
+          docker run -d --name sne -p 8000:8000 \
+            -v "$GITHUB_WORKSPACE:/home/frappe/frappe-bench/apps/$APP" "$SNE_IMAGE"
+          for _ in $(seq 1 60); do
+            curl -fsS --max-time 5 -o /dev/null -H 'Host: dev.localhost' http://localhost:8000/api/method/ping && exit 0
+            sleep 5
+          done
+          echo "::error::SNE site never came up"; docker logs --tail 80 sne; exit 1
+
+      - name: Install dependencies inside bench
+        run: |
+          docker exec -w /home/frappe/frappe-bench sne ./env/bin/pip install -r "apps/$APP/requirements.txt"
+
+      - name: Install the app on the site
+        run: |
+          docker exec -w /home/frappe/frappe-bench sne bench --site dev.localhost install-app "$APP"
+
+      - name: Create the site's encryption key
+        run: |
+          docker exec -w /home/frappe/frappe-bench sne bench --site dev.localhost execute frappe.utils.password.get_encryption_key >/dev/null || true
+
+      - name: Restart the bench so the web workers load the app
+        run: |
+          docker restart sne
+          for _ in $(seq 1 60); do
+            curl -fsS --max-time 5 -o /dev/null -H 'Host: dev.localhost' http://localhost:8000/api/method/ping && exit 0
+            sleep 5
+          done
+          echo "::error::SNE site did not come back after restart"; docker logs --tail 80 sne; exit 1
+
+      - name: Run tests on SNE bench
+        run: |
+          docker exec -w /home/frappe/frappe-bench sne bench --site dev.localhost list-apps | grep -w "$APP"
+          docker exec -w /home/frappe/frappe-bench sne bench --site dev.localhost set-config allow_tests true
+          docker exec -w /home/frappe/frappe-bench sne bench --site dev.localhost run-tests --app "$APP"
+          docker exec -w /home/frappe/frappe-bench sne ./env/bin/python -m unittest discover "apps/$APP/saas_platform/utils"
+          docker exec -w /home/frappe/frappe-bench sne bench --site dev.localhost execute saas_platform.utils.test_tenant.test_create_tenant
+
+      - name: Bench logs on failure
+        if: failure()
+        run: |
+          docker logs --tail 200 sne || true
+          docker exec -w /home/frappe/frappe-bench sne sh -c 'tail -n 200 logs/*.log' || true
+
+  # ──────────────────────────────────────────────────────────────────────
+  # Tier 2b — package. Builds the FPM package with vendored wheels.
+  # ──────────────────────────────────────────────────────────────────────
+  package:
+    name: Build FPM package
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    needs: lint
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      kind: ${{ steps.version.outputs.kind }}
+      file: ${{ steps.build.outputs.file }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve package version
+        id: version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          app_version="$(python3 - <<'PY'
+          import re
+          print(re.search(r'__version__\s*=\s*"([^"]+)"', open("saas_platform/__init__.py").read()).group(1))
+          PY
+          )"
+          if [ -n "$INPUT_VERSION" ]; then
+            version="$INPUT_VERSION"; kind=manual
+          elif [ "$REF_TYPE" = tag ]; then
+            version="${REF_NAME#v}"; kind=release
+            if [ "$version" != "$app_version" ]; then
+              echo "::error::tag $REF_NAME does not match saas_platform.__version__ = $app_version; bump __init__.py first"
+              exit 1
+            fi
+          else
+            version="${app_version}-git.$(date -u +%Y%m%d).$(git rev-parse --short=7 HEAD)"; kind=snapshot
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "kind=$kind" >> "$GITHUB_OUTPUT"
+          echo "Packaging $ORG/$APP==$version ($kind)"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.BENCH_PYTHON }}
+
+      - name: Install build tools
+        run: |
+          python -m pip install --upgrade pip wheel
+
+      - name: Obtain FPM CLI
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tmp="$(mktemp -d)"
+          gh release download "$FPM_VERSION" --repo vyogotech/fpm \
+            --pattern 'fpm-linux-amd64' --pattern 'fpm-linux-amd64.sha256' --dir "$tmp"
+          ( cd "$tmp" && sha256sum -c fpm-linux-amd64.sha256 )
+          mkdir -p bin
+          install -m 0755 "$tmp/fpm-linux-amd64" bin/fpm
+          rm -rf "$tmp"
+          ./bin/fpm --version
+
+      - name: Build the package
+        id: build
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          mkdir -p dist
+          ./bin/fpm package . \
+            --org "$ORG" --app-name "$APP" \
+            --version "$VERSION" \
+            --python-version "$BENCH_PYTHON" \
+            --platform manylinux2014_x86_64 --platform manylinux2014_aarch64 \
+            --skip-local-install --overwrite \
+            --output-path dist
+          set -- dist/*.fpm
+          [ -f "$1" ] || { echo "::error::no .fpm produced"; exit 1; }
+          echo "file=$(basename "$1")" >> "$GITHUB_OUTPUT"
+          ls -la dist
+
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: fpm-package
+          path: dist/*.fpm
+          if-no-files-found: error
+          retention-days: 14
+
+  # ──────────────────────────────────────────────────────────────────────
+  # Tier 3 — verify in fresh SNE. Installs the built .fpm package into a
+  # fresh SNE bench via `fpm install`, exactly as production does.
+  # ──────────────────────────────────────────────────────────────────────
+  verify:
+    name: Install the package into SNE
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    needs: package
+
+    steps:
+      - name: Download package artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: fpm-package
+          path: dist
+
+      - name: Obtain FPM CLI
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tmp="$(mktemp -d)"
+          gh release download "$FPM_VERSION" --repo vyogotech/fpm \
+            --pattern 'fpm-linux-amd64' --pattern 'fpm-linux-amd64.sha256' --dir "$tmp"
+          ( cd "$tmp" && sha256sum -c fpm-linux-amd64.sha256 )
+          mkdir -p bin
+          install -m 0755 "$tmp/fpm-linux-amd64" bin/fpm
+          rm -rf "$tmp"
+
+      - name: Start the SNE bench
+        run: |
+          docker run -d --name sne -p 8000:8000 "$SNE_IMAGE"
+          for _ in $(seq 1 60); do
+            curl -fsS --max-time 5 -o /dev/null -H 'Host: dev.localhost' http://localhost:8000/api/method/ping && exit 0
+            sleep 5
+          done
+          echo "::error::SNE site never came up"; docker logs --tail 80 sne; exit 1
+
+      - name: fpm install
+        env:
+          FILE: ${{ needs.package.outputs.file }}
+        run: |
+          docker cp bin/fpm sne:/tmp/fpm
+          docker cp "dist/$FILE" sne:/tmp/package.fpm
+          docker exec -u 0 sne chown 1001 /tmp/fpm /tmp/package.fpm
+          docker exec -u 0 sne chmod +x /tmp/fpm
+          docker exec -w /home/frappe/frappe-bench sne /tmp/fpm install /tmp/package.fpm \
+            --bench-path /home/frappe/frappe-bench --site dev.localhost --skip-required-apps-check
+
+      - name: Restart the bench so the web workers load the app
+        run: |
+          docker restart sne
+          for _ in $(seq 1 60); do
+            curl -fsS --max-time 5 -o /dev/null -H 'Host: dev.localhost' http://localhost:8000/api/method/ping && exit 0
+            sleep 5
+          done
+          echo "::error::SNE site did not come back after restart"; docker logs --tail 80 sne; exit 1
+
+      - name: Verify app is installed and operational
+        run: |
+          docker exec -w /home/frappe/frappe-bench sne bench --site dev.localhost list-apps | grep -w "$APP"
+          docker exec -w /home/frappe/frappe-bench sne bench --site dev.localhost execute frappe.db.exists --args "['DocType', 'Tenant']"
+          docker exec -w /home/frappe/frappe-bench sne bench --site dev.localhost execute frappe.db.exists --args "['DocType', 'Plan']"
+          docker exec -w /home/frappe/frappe-bench sne bench --site dev.localhost execute saas_platform.utils.test_tenant.test_create_tenant
+
+      - name: Bench logs on failure
+        if: failure()
+        run: |
+          docker logs --tail 200 sne || true
+          docker exec -w /home/frappe/frappe-bench sne sh -c 'tail -n 200 logs/*.log' || true
+
+  # ──────────────────────────────────────────────────────────────────────
+  # Tier 4 — publish. Verified package published to registries.
+  # ──────────────────────────────────────────────────────────────────────
+  publish:
+    name: Publish to the FPM registry
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    needs: [package, verify, test]
+    if: >-
+      github.ref_type == 'tag' ||
+      (github.event_name == 'push' && github.ref_name == 'main') ||
+      (github.event_name == 'workflow_dispatch' && inputs.publish)
+
+    steps:
+      - name: Download package artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: fpm-package
+          path: dist
+
+      - name: Obtain FPM CLI
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tmp="$(mktemp -d)"
+          gh release download "$FPM_VERSION" --repo vyogotech/fpm \
+            --pattern 'fpm-linux-amd64' --pattern 'fpm-linux-amd64.sha256' --dir "$tmp"
+          ( cd "$tmp" && sha256sum -c fpm-linux-amd64.sha256 )
+          mkdir -p bin
+          install -m 0755 "$tmp/fpm-linux-amd64" bin/fpm
+          rm -rf "$tmp"
+
+      - name: Publish to GHCR (OCI)
+        env:
+          VERSION: ${{ needs.package.outputs.version }}
+          FILE: ${{ needs.package.outputs.file }}
+          FPM_REPO_GHCR_PASSWORD: ${{ secrets.FPM_REGISTRY_PASSWORD || secrets.GITHUB_TOKEN }}
+        run: |
+          ./bin/fpm repo add ghcr "$FPM_OCI_REPOSITORY" --type oci --username "${{ github.actor }}"
+          ./bin/fpm publish --from-file "dist/$FILE" --repo ghcr
+          ./bin/fpm exists "$ORG/$APP==$VERSION" --remote
+
+      - name: Publish to the Vyogo FPM registry (HTTP)
+        env:
+          VERSION: ${{ needs.package.outputs.version }}
+          FILE: ${{ needs.package.outputs.file }}
+          FPM_HTTP_USER: ${{ secrets.FPM_REGISTRY_USERNAME }}
+          FPM_REPO_VYOGO_PASSWORD: ${{ secrets.FPM_REGISTRY_PASSWORD }}
+        run: |
+          if [ -n "$FPM_HTTP_USER" ] && [ -n "$FPM_REPO_VYOGO_PASSWORD" ]; then
+            ./bin/fpm repo add vyogo "$FPM_HTTP_REGISTRY" --type http --username "$FPM_HTTP_USER"
+            ./bin/fpm publish --from-file "dist/$FILE" --repo vyogo
+            echo "$ORG/$APP==$VERSION is in $FPM_HTTP_REGISTRY"
+          else
+            echo "Vyogo HTTP registry credentials not configured; skipped HTTP publish."
+          fi
+
+      - name: Summary
+        env:
+          VERSION: ${{ needs.package.outputs.version }}
+          KIND: ${{ needs.package.outputs.kind }}
+        run: |
+          {
+            echo "### Published \`$ORG/$APP==$VERSION\` ($KIND)"
+            echo
+            echo "- \`$FPM_OCI_REPOSITORY\`"
+            echo
+            echo '```bash'
+            echo "fpm repo add ghcr $FPM_OCI_REPOSITORY --type oci"
+            echo "fpm install $ORG/$APP==$VERSION --bench-path <bench> --site <site>"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
