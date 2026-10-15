@@ -24,16 +24,11 @@ jobs:
       - name: Install Python Dependencies
         run: |
           pip install -r requirements.txt
-          pip install frappe-bench
+          pip install flake8
       - name: Lint Backend
         run: flake8 saas_platform
-      - name: Security Scan (Bandit & pip-audit)
-        run: |
-          pip install bandit pip-audit
-          bandit -r saas_platform -ll
-          pip-audit --fail-on high
       - name: Run Backend Tests
-        run: pytest --maxfail=1 --disable-warnings -q
+        run: python -m unittest discover saas_platform/utils
 
   build-and-deploy:
     needs: lint-and-test

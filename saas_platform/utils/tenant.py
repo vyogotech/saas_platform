@@ -22,7 +22,7 @@ def on_session_creation(login_manager):
     if user == "Administrator":
         frappe.session.data["tenant_id"] = "SYSTEM"
         _persist_session()
-        frappe.log(f"Session created for Administrator with tenant_id=SYSTEM")
+        frappe.log("Session created for Administrator with tenant_id=SYSTEM")
         return
 
     # Get tenant_id from User document

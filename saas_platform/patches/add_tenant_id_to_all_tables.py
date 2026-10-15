@@ -99,7 +99,7 @@ def add_tenant_id_column(doctype_name):
             ALTER TABLE `{table_name}` 
             ADD INDEX `{index_name}` (tenant_id)
         """)
-    except Exception as e:
+    except Exception:
         # Index might already exist, that's okay
         pass
 

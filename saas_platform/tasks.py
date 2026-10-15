@@ -1,6 +1,8 @@
 import subprocess
 import frappe
-from frappe.utils import  nowdate, add_days
+from frappe.utils import nowdate, add_days
+
+
 def provision_site(tenant, password):
     doc = frappe.get_doc("Tenant", tenant)
     site_name = f"{doc.subdomain}.localhost"

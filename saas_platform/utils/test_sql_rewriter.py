@@ -3,7 +3,7 @@ Unit tests for SQL AST Rewriter and Multi-Tenant Query Isolation.
 """
 
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 try:
     import frappe
 except ImportError:

@@ -47,7 +47,7 @@ def test_create_tenant():
             for plan in subscription.plans:
                 print(f"      Plan: {plan.plan} (qty: {plan.qty})")
     else:
-        print(f"   ❌ No Subscription created")
+        print("   ❌ No Subscription created")
 
     # Check Customer was created with SYSTEM tenant_id
     customer = frappe.get_all("Customer",
@@ -70,7 +70,7 @@ def test_create_tenant():
             print(f"   ✅ Company: {company.name}")
             print(f"      tenant_id: {company.tenant_id}")
     else:
-        print(f"   ❌ No Company with tenant_id found")
+        print("   ❌ No Company with tenant_id found")
 
     # Check Admin User was created with tenant's tenant_id
     admin_user = frappe.get_all("User",
@@ -84,6 +84,6 @@ def test_create_tenant():
         print(f"      tenant_id: {user.tenant_id}")
         print(f"      enabled: {user.enabled}")
     else:
-        print(f"   ❌ No Admin User created")
+        print("   ❌ No Admin User created")
 
     return tenant.name

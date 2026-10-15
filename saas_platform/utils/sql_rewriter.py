@@ -109,6 +109,7 @@ def _rewrite_query_cached(sql: str, tenant_id: str, dialect: str = "mysql", tena
     tenant_tables=None treats every non-system `tab*` table as tenant-scoped.
     """
     params = []
+
     def _mask_param(match):
         params.append(match.group(0))
         return f"__FP_{len(params)-1}__"

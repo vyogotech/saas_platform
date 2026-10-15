@@ -251,7 +251,7 @@ class Tenant(Document):
 
             plan.insert(ignore_permissions=True)
             frappe.db.commit()
-            frappe.log(f"Created Free Subscription Plan")
+            frappe.log("Created Free Subscription Plan")
         except Exception as e:
             frappe.log_error(
                 f"Failed to create Free Subscription Plan: {str(e)}")
