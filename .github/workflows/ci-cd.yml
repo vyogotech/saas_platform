@@ -342,14 +342,16 @@ jobs:
           VERSION: ${{ needs.package.outputs.version }}
           FILE: ${{ needs.package.outputs.file }}
           FPM_REPO_GHCR_PASSWORD: ${{ secrets.FPM_REGISTRY_PASSWORD || secrets.GITHUB_TOKEN }}
+          REGISTRY_PASSWORD: ${{ secrets.FPM_REGISTRY_PASSWORD || secrets.GITHUB_TOKEN }}
+          FPM_REPO_PASSWORD: ${{ secrets.FPM_REGISTRY_PASSWORD || secrets.GITHUB_TOKEN }}
         run: |
-          OCI_REPO="${FPM_OCI_REPOSITORY:-ghcr.io/${{ github.repository }}}"
-          ./bin/fpm repo add ghcr "$OCI_REPO" --type oci --username "${{ github.actor }}"
-          if ! ./bin/fpm publish --from-file "dist/$FILE" --repo ghcr; then
-            echo "Could not publish to $OCI_REPO with default token; falling back to ghcr.io/${{ github.repository }}"
-            ./bin/fpm repo add ghcr-fallback "ghcr.io/${{ github.repository }}" --type oci --username "${{ github.actor }}"
-            ./bin/fpm publish --from-file "dist/$FILE" --repo ghcr-fallback
+          if [ -n "${{ secrets.FPM_REGISTRY_PASSWORD }}" ]; then
+            TARGET_REPO="$FPM_OCI_REPOSITORY"
+          else
+            TARGET_REPO="ghcr.io/${{ github.repository }}"
           fi
+          ./bin/fpm repo add ghcr "$TARGET_REPO" --type oci --username "${{ github.actor }}"
+          ./bin/fpm publish --from-file "dist/$FILE" --repo ghcr
 
       - name: Publish to the Vyogo FPM registry (HTTP)
         env:
@@ -371,13 +373,18 @@ jobs:
           VERSION: ${{ needs.package.outputs.version }}
           KIND: ${{ needs.package.outputs.kind }}
         run: |
+          if [ -n "${{ secrets.FPM_REGISTRY_PASSWORD }}" ]; then
+            TARGET_REPO="$FPM_OCI_REPOSITORY"
+          else
+            TARGET_REPO="ghcr.io/${{ github.repository }}"
+          fi
           {
             echo "### Published \`$ORG/$APP==$VERSION\` ($KIND)"
             echo
-            echo "- \`$FPM_OCI_REPOSITORY\`"
+            echo "- \`$TARGET_REPO\`"
             echo
             echo '```bash'
-            echo "fpm repo add ghcr $FPM_OCI_REPOSITORY --type oci"
+            echo "fpm repo add ghcr $TARGET_REPO --type oci"
             echo "fpm install $ORG/$APP==$VERSION --bench-path <bench> --site <site>"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
