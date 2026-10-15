@@ -1,4 +1,4 @@
-__version__ = "0.0.1"
+__version__ = "2.0.0"
 
 # Tenant isolation patches. No try/except: if these fail to install, tenant
 # queries would run unfiltered, so the app must fail loudly instead.
